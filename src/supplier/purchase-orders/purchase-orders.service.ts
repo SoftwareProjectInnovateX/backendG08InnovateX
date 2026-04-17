@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
 import {
   collection,
@@ -72,7 +76,9 @@ export class PurchaseOrdersService {
 
     // 2. Verify supplier owns this order
     if (order.supplierId !== supplierId) {
-      throw new BadRequestException('Unauthorized: order does not belong to this supplier');
+      throw new BadRequestException(
+        'Unauthorized: order does not belong to this supplier',
+      );
     }
 
     if (order.status !== 'PENDING') {
@@ -112,7 +118,11 @@ export class PurchaseOrdersService {
 
     // 7. Update admin product (adminProducts collection)
     if (order.adminProductId) {
-      const adminProductRef = doc(this.db, 'adminProducts', order.adminProductId);
+      const adminProductRef = doc(
+        this.db,
+        'adminProducts',
+        order.adminProductId,
+      );
       const adminProductSnap = await getDoc(adminProductRef);
       if (adminProductSnap.exists()) {
         const currentAdminStock: number = adminProductSnap.data().stock ?? 0;
@@ -226,7 +236,9 @@ export class PurchaseOrdersService {
     const order = orderSnap.data() as any;
 
     if (order.supplierId !== supplierId) {
-      throw new BadRequestException('Unauthorized: order does not belong to this supplier');
+      throw new BadRequestException(
+        'Unauthorized: order does not belong to this supplier',
+      );
     }
 
     if (order.status !== 'PENDING') {

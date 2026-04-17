@@ -7,7 +7,10 @@ export class OrdersService {
 
   async getAllOrders() {
     const db = this.firebaseService.getDb();
-    const snapshot = await db.collection('orders').orderBy('date', 'desc').get();
+    const snapshot = await db
+      .collection('orders')
+      .orderBy('date', 'desc')
+      .get();
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 

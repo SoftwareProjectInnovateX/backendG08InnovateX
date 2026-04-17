@@ -1,6 +1,14 @@
 import {
-  Controller, Get, Post, Patch, Delete,
-  Body, Param, Query, HttpCode, HttpStatus,
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { SupplierProductsService } from './supplier-products.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -23,7 +31,7 @@ export class SupplierProductsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   createProduct(
-    @Query('supplierId')   supplierId:   string,
+    @Query('supplierId') supplierId: string,
     @Query('supplierName') supplierName: string,
     @Body() dto: CreateProductDto,
   ) {

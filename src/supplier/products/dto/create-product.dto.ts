@@ -1,4 +1,10 @@
-import { IsString, IsNumber, IsOptional, IsNotEmpty, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsNotEmpty,
+  IsIn,
+} from 'class-validator';
 
 export class CreateProductDto {
   @IsString()
@@ -7,7 +13,13 @@ export class CreateProductDto {
 
   @IsString()
   @IsNotEmpty()
-  @IsIn(['Medicine', 'Baby Item', 'Skincare', 'Medical Equipment', 'Supplements'])
+  @IsIn([
+    'Medicine',
+    'Baby Item',
+    'Skincare',
+    'Medical Equipment',
+    'Supplements',
+  ])
   category: string;
 
   @IsNumber()
@@ -15,11 +27,11 @@ export class CreateProductDto {
 
   @IsNumber()
   @IsOptional()
-  stock: number = 0;        // Stock Supplied to MediCareX
+  stock: number = 0; // Stock Supplied to MediCareX
 
   @IsNumber()
   @IsOptional()
-  minStock: number = 0;     // Remaining Stock with supplier
+  minStock: number = 0; // Remaining Stock with supplier
 
   @IsString()
   @IsOptional()

@@ -7,7 +7,7 @@ import { CountersModule } from '../../shared/counters/counters.module';
 @Module({
   imports: [
     FirebaseModule,
-    CountersModule,     // needed for generateProductCode()
+    CountersModule, // needed for generateProductCode()
   ],
   controllers: [SupplierProductsController],
   providers: [SupplierProductsService],

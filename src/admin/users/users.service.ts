@@ -7,7 +7,10 @@ export class UsersService {
 
   async getAllUsers() {
     const db = this.firebaseService.getDb();
-    const snapshot = await db.collection('users').orderBy('createdAt', 'desc').get();
+    const snapshot = await db
+      .collection('users')
+      .orderBy('createdAt', 'desc')
+      .get();
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 

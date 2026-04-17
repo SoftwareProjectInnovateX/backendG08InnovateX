@@ -16,7 +16,8 @@ export class SupplierProductsService {
   async getProducts(supplierId: string) {
     const db = this.firebaseService.getDb();
 
-    const snapshot = await db.collection('products')
+    const snapshot = await db
+      .collection('products')
       .where('supplierId', '==', supplierId)
       .orderBy('createdAt', 'desc')
       .get();
@@ -25,49 +26,53 @@ export class SupplierProductsService {
   }
 
   // ── POST /supplier/products ───────────────────────────────────────────────
-  async createProduct(supplierId: string, supplierName: string, dto: CreateProductDto) {
+  async createProduct(
+    supplierId: string,
+    supplierName: string,
+    dto: CreateProductDto,
+  ) {
     const db = this.firebaseService.getDb();
 
     const productCode = await this.countersService.generateProductCode();
 
-    const suppliedStock  = dto.stock    || 0;
+    const suppliedStock = dto.stock || 0;
     const remainingStock = dto.minStock || 0;
 
     const newProduct = {
-      productName:    dto.productName,
+      productName: dto.productName,
       productCode,
-      category:       dto.category,
+      category: dto.category,
       wholesalePrice: dto.wholesalePrice,
-      stock:          suppliedStock,
-      minStock:       remainingStock,
-      description:    dto.description  || '',
-      manufacturer:   dto.manufacturer || '',
-      availability:   remainingStock > 0 ? 'in stock' : 'out of stock',
+      stock: suppliedStock,
+      minStock: remainingStock,
+      description: dto.description || '',
+      manufacturer: dto.manufacturer || '',
+      availability: remainingStock > 0 ? 'in stock' : 'out of stock',
       supplierId,
       supplierName,
-      createdAt:      Timestamp.now(),
-      updatedAt:      Timestamp.now(),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
     };
 
     const productRef = await db.collection('products').add(newProduct);
 
     await db.collection('adminProducts').add({
-      productId:      productRef.id,
+      productId: productRef.id,
       supplierId,
       supplierName,
-      productName:    dto.productName,
+      productName: dto.productName,
       productCode,
-      category:       dto.category,
+      category: dto.category,
       wholesalePrice: dto.wholesalePrice,
-      retailPrice:    (dto.wholesalePrice ?? 0) * 1.2,
-      stock:          suppliedStock,
-      minStock:       remainingStock,
-      description:    dto.description  || '',
-      manufacturer:   dto.manufacturer || '',
-      availability:   remainingStock > 0 ? 'in stock' : 'out of stock',
-      lastRestocked:  Timestamp.now(),
-      createdAt:      Timestamp.now(),
-      updatedAt:      Timestamp.now(),
+      retailPrice: (dto.wholesalePrice ?? 0) * 1.2,
+      stock: suppliedStock,
+      minStock: remainingStock,
+      description: dto.description || '',
+      manufacturer: dto.manufacturer || '',
+      availability: remainingStock > 0 ? 'in stock' : 'out of stock',
+      lastRestocked: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
     });
 
     return { productId: productRef.id, productCode };
@@ -77,32 +82,36 @@ export class SupplierProductsService {
   async updateProduct(productId: string, dto: UpdateProductDto) {
     const db = this.firebaseService.getDb();
 
-    const suppliedStock  = dto.stock    ?? 0;
+    const suppliedStock = dto.stock ?? 0;
     const remainingStock = dto.minStock ?? 0;
 
     const updatedData = {
-      ...(dto.productName    && { productName:    dto.productName }),
-      ...(dto.category       && { category:       dto.category }),
+      ...(dto.productName && { productName: dto.productName }),
+      ...(dto.category && { category: dto.category }),
       ...(dto.wholesalePrice && { wholesalePrice: dto.wholesalePrice }),
-      stock:        suppliedStock,
-      minStock:     remainingStock,
-      description:  dto.description  ?? '',
+      stock: suppliedStock,
+      minStock: remainingStock,
+      description: dto.description ?? '',
       manufacturer: dto.manufacturer ?? '',
       availability: remainingStock > 0 ? 'in stock' : 'out of stock',
-      updatedAt:    Timestamp.now(),
+      updatedAt: Timestamp.now(),
     };
 
     await db.collection('products').doc(productId).update(updatedData);
 
-    const adminSnap = await db.collection('adminProducts')
+    const adminSnap = await db
+      .collection('adminProducts')
       .where('productId', '==', productId)
       .get();
 
     if (!adminSnap.empty) {
-      await db.collection('adminProducts').doc(adminSnap.docs[0].id).update({
-        ...updatedData,
-        ...(dto.wholesalePrice && { retailPrice: dto.wholesalePrice * 1.2 }),
-      });
+      await db
+        .collection('adminProducts')
+        .doc(adminSnap.docs[0].id)
+        .update({
+          ...updatedData,
+          ...(dto.wholesalePrice && { retailPrice: dto.wholesalePrice * 1.2 }),
+        });
     }
 
     return { success: true };
@@ -114,7 +123,8 @@ export class SupplierProductsService {
 
     await db.collection('products').doc(productId).delete();
 
-    const adminSnap = await db.collection('adminProducts')
+    const adminSnap = await db
+      .collection('adminProducts')
       .where('productId', '==', productId)
       .get();
 
