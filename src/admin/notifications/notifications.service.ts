@@ -34,7 +34,7 @@ export class NotificationsService {
     return { success: true, message: 'Notification marked as read' };
   }
 
-  // ─── PATCH mark ALL notifications as read ─────────────────────
+  // ─── PATCH mark ALL notifications as read 
   async markAllAsRead() {
     const snapshot = await this.db
       .collection('notifications')
@@ -49,7 +49,7 @@ export class NotificationsService {
     return { success: true, message: `${snapshot.size} notifications marked as read` };
   }
 
-  // ─── PATCH mark order as received (ORDER_APPROVED action) ─────
+  // ─── PATCH mark order as received (ORDER_APPROVED action) 
   async markOrderAsReceived(notificationId: string) {
     // 1. Get notification
     const notifRef = this.db.collection('notifications').doc(notificationId);
@@ -106,7 +106,7 @@ export class NotificationsService {
     };
   }
 
-  // ─── DELETE notification ───────────────────────────────────────
+  // ─── DELETE notification 
   async deleteNotification(notificationId: string) {
     const ref = this.db.collection('notifications').doc(notificationId);
     const snap = await ref.get();
