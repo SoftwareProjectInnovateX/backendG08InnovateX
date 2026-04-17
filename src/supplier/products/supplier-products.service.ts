@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
 import { CountersService } from '../../shared/counters/counters.service';
+import { SearchService } from '../../shared/search/search.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -10,6 +11,7 @@ export class SupplierProductsService {
   constructor(
     private readonly firebaseService: FirebaseService,
     private readonly countersService: CountersService,
+    private readonly searchService: SearchService,
   ) {}
 
   // ── GET /supplier/products ────────────────────────────────────────────────
@@ -56,7 +58,7 @@ export class SupplierProductsService {
 
     const productRef = await db.collection('products').add(newProduct);
 
-    await db.collection('adminProducts').add({
+    const adminRef = await db.collection('adminProducts').add({
       productId: productRef.id,
       supplierId,
       supplierName,
@@ -75,9 +77,19 @@ export class SupplierProductsService {
       updatedAt: Timestamp.now(),
     });
 
+    await this.searchService.upsertProductToIndex(adminRef.id, {
+      id: adminRef.id,
+      productName: dto.productName,
+      description: dto.description ?? '',
+      category: dto.category,
+      manufacturer: dto.manufacturer ?? '',
+      availability: remainingStock > 0 ? 'in stock' : 'out of stock',
+      similarityScore: 0,
+      searchSource: 'supplier',
+    });
+
     return { productId: productRef.id, productCode };
   }
-
   // ── PATCH /supplier/products/:id ─────────────────────────────────────────
   async updateProduct(productId: string, dto: UpdateProductDto) {
     const db = this.firebaseService.getDb();
@@ -105,13 +117,28 @@ export class SupplierProductsService {
       .get();
 
     if (!adminSnap.empty) {
+      const adminDocId = adminSnap.docs[0].id; // ✅ FIX
+
       await db
         .collection('adminProducts')
-        .doc(adminSnap.docs[0].id)
+        .doc(adminDocId)
         .update({
           ...updatedData,
-          ...(dto.wholesalePrice && { retailPrice: dto.wholesalePrice * 1.2 }),
+          ...(dto.wholesalePrice && {
+            retailPrice: dto.wholesalePrice * 1.2,
+          }),
         });
+
+      await this.searchService.upsertProductToIndex(adminDocId, {
+        id: adminDocId,
+        productName: dto.productName ?? '',
+        description: dto.description ?? '',
+        category: dto.category ?? '',
+        manufacturer: dto.manufacturer ?? '',
+        availability: remainingStock > 0 ? 'in stock' : 'out of stock',
+        similarityScore: 0,
+        searchSource: 'supplier',
+      });
     }
 
     return { success: true };
@@ -129,7 +156,11 @@ export class SupplierProductsService {
       .get();
 
     if (!adminSnap.empty) {
-      await db.collection('adminProducts').doc(adminSnap.docs[0].id).delete();
+      const adminDocId = adminSnap.docs[0].id;
+
+      await db.collection('adminProducts').doc(adminDocId).delete();
+
+      await this.searchService.removeProductFromIndex(adminDocId);
     }
 
     return { success: true };
