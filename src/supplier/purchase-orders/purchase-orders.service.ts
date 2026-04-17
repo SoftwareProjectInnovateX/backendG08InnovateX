@@ -21,7 +21,7 @@ export class PurchaseOrdersService {
     this.firebaseService.getDb();
   }
 
-  // ─── GET ORDERS ──────────────────────────────────────────────────────────────
+  // ─── GET ORDERS 
   async getOrders(supplierId: string, status?: string) {
     try {
       const ordersRef = collection(this.db, 'purchaseOrders');
@@ -47,7 +47,7 @@ export class PurchaseOrdersService {
     }
   }
 
-  // ─── GET SINGLE ORDER ─────────────────────────────────────────────────────────
+  // ─── GET SINGLE ORDER 
   async getOrderById(orderId: string) {
     const orderRef = doc(this.db, 'purchaseOrders', orderId);
     const orderSnap = await getDoc(orderRef);
@@ -57,7 +57,7 @@ export class PurchaseOrdersService {
     return { id: orderSnap.id, ...orderSnap.data() };
   }
 
-  // ─── APPROVE ORDER ────────────────────────────────────────────────────────────
+  // ─── APPROVE ORDER 
   async approveOrder(
     orderId: string,
     supplierId: string,
@@ -207,7 +207,7 @@ export class PurchaseOrdersService {
     };
   }
 
-  // ─── REJECT ORDER ─────────────────────────────────────────────────────────────
+  // ─── REJECT ORDER 
   async rejectOrder(
     orderId: string,
     supplierId: string,
