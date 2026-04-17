@@ -10,9 +10,12 @@ import { CountersModule } from './shared/counters/counters.module.js';
 // Admin
 import { UsersModule } from './admin/users/users.module.js';
 import { OrdersModule } from './admin/orders/orders.module.js';
+import { NotificationsModule } from './admin/notifications/notifications.module.js';
 
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
+import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders.module.js';
+
 
 @Module({
   imports: [
@@ -25,9 +28,11 @@ import { SupplierProductsModule } from './supplier/products/supplier-products.mo
     // Admin
     UsersModule,
     OrdersModule,
+    NotificationsModule,
 
     // Supplier
     SupplierProductsModule,
+    PurchaseOrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
