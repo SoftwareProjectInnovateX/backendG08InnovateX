@@ -19,7 +19,7 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),  // ← add this FIRST
+    ConfigModule.forRoot({ isGlobal: true }),  
 
     // Shared
     FirebaseModule,
