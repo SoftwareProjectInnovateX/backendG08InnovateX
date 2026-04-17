@@ -1,0 +1,35 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';  // ← add this
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
+
+// Shared
+import { FirebaseModule } from './shared/firebase/firebase.module.js';
+import { CountersModule } from './shared/counters/counters.module.js';
+
+// Admin
+import { UsersModule } from './admin/users/users.module.js';
+import { OrdersModule } from './admin/orders/orders.module.js';
+
+// Supplier
+import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),  // ← add this FIRST
+
+    // Shared
+    FirebaseModule,
+    CountersModule,
+
+    // Admin
+    UsersModule,
+    OrdersModule,
+
+    // Supplier
+    SupplierProductsModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
