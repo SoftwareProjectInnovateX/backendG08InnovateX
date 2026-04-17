@@ -1,0 +1,121 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { FirebaseService } from '../../shared/firebase/firebase.service';
+import { FieldValue } from 'firebase-admin/firestore';
+
+@Injectable()
+export class NotificationsService {
+  constructor(private readonly firebaseService: FirebaseService) {}
+
+  private get db() {
+    return this.firebaseService.getDb();
+  }
+
+  // ─── GET all notifications for recipientType ───────────────────
+  async getNotifications(recipientType: string = 'admin') {
+    const snapshot = await this.db
+      .collection('notifications')
+      .where('recipientType', '==', recipientType)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+
+  // ─── PATCH mark single notification as read ────────────────────
+  async markAsRead(notificationId: string) {
+    const ref = this.db.collection('notifications').doc(notificationId);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    await ref.update({ read: true });
+    return { success: true, message: 'Notification marked as read' };
+  }
+
+  // ─── PATCH mark ALL notifications as read ─────────────────────
+  async markAllAsRead() {
+    const snapshot = await this.db
+      .collection('notifications')
+      .where('recipientType', '==', 'admin')
+      .where('read', '==', false)
+      .get();
+
+    const batch = this.db.batch();
+    snapshot.docs.forEach((d) => batch.update(d.ref, { read: true }));
+    await batch.commit();
+
+    return { success: true, message: `${snapshot.size} notifications marked as read` };
+  }
+
+  // ─── PATCH mark order as received (ORDER_APPROVED action) ─────
+  async markOrderAsReceived(notificationId: string) {
+    // 1. Get notification
+    const notifRef = this.db.collection('notifications').doc(notificationId);
+    const notifSnap = await notifRef.get();
+
+    if (!notifSnap.exists) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    const notification = notifSnap.data()!; // ✅ non-null assertion (exists check is above)
+
+    // 2. Get purchase order
+    const orderRef = this.db.collection('purchaseOrders').doc(notification.orderId);
+    const orderSnap = await orderRef.get();
+
+    if (!orderSnap.exists) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const order = orderSnap.data()!; // ✅ non-null assertion (exists check is above)
+
+    // 3. Validate order status
+    if (order.status !== 'APPROVED') {
+      throw new BadRequestException('Order must be APPROVED before marking as received');
+    }
+
+    // 4. Update purchase order to COMPLETED
+    await orderRef.update({
+      status: 'COMPLETED',
+      completionDate: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // 5. Update adminProduct stock
+    const adminProductRef = this.db.collection('adminProducts').doc(order.adminProductId);
+    const adminProductSnap = await adminProductRef.get();
+
+    if (adminProductSnap.exists) {
+      const adminProduct = adminProductSnap.data()!; // ✅ non-null assertion (exists check is above)
+      await adminProductRef.update({
+        stock: (adminProduct.stock || 0) + order.quantity,
+        availability: 'in stock',
+        lastRestocked: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    // 6. Mark notification as read
+    await notifRef.update({ read: true });
+
+    return {
+      success: true,
+      message: 'Order marked as received. Inventory has been updated.',
+    };
+  }
+
+  // ─── DELETE notification ───────────────────────────────────────
+  async deleteNotification(notificationId: string) {
+    const ref = this.db.collection('notifications').doc(notificationId);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    await ref.delete();
+    return { success: true, message: 'Notification deleted' };
+  }
+}
