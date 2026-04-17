@@ -59,7 +59,7 @@ export class NotificationsService {
       throw new NotFoundException('Notification not found');
     }
 
-    const notification = notifSnap.data()!; // ✅ non-null assertion (exists check is above)
+    const notification = notifSnap.data()!; 
 
     // 2. Get purchase order
     const orderRef = this.db.collection('purchaseOrders').doc(notification.orderId);
@@ -69,7 +69,7 @@ export class NotificationsService {
       throw new NotFoundException('Order not found');
     }
 
-    const order = orderSnap.data()!; // ✅ non-null assertion (exists check is above)
+    const order = orderSnap.data()!; 
 
     // 3. Validate order status
     if (order.status !== 'APPROVED') {
@@ -88,7 +88,7 @@ export class NotificationsService {
     const adminProductSnap = await adminProductRef.get();
 
     if (adminProductSnap.exists) {
-      const adminProduct = adminProductSnap.data()!; // ✅ non-null assertion (exists check is above)
+      const adminProduct = adminProductSnap.data()!; 
       await adminProductRef.update({
         stock: (adminProduct.stock || 0) + order.quantity,
         availability: 'in stock',
