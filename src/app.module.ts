@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';  // ← add this
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -11,15 +11,15 @@ import { CountersModule } from './shared/counters/counters.module.js';
 import { UsersModule } from './admin/users/users.module.js';
 import { OrdersModule } from './admin/orders/orders.module.js';
 import { NotificationsModule } from './admin/notifications/notifications.module.js';
+import { AdminSearchModule } from './admin/search/search.module.js';
 
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
 import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders.module.js';
 
-
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),  // ← add this FIRST
+    ConfigModule.forRoot({ isGlobal: true }),
 
     // Shared
     FirebaseModule,
@@ -29,6 +29,7 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
     UsersModule,
     OrdersModule,
     NotificationsModule,
+    AdminSearchModule,
 
     // Supplier
     SupplierProductsModule,
