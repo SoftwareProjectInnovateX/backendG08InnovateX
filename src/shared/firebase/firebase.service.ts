@@ -4,10 +4,12 @@ dotenv.config();
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getAuth, Auth } from 'firebase-admin/auth';
 
 @Injectable()
 export class FirebaseService implements OnModuleInit {
   private db!: Firestore;
+  private authAdmin!: Auth;
 
   onModuleInit() {
     if (!getApps().length) {
@@ -20,9 +22,14 @@ export class FirebaseService implements OnModuleInit {
       });
     }
     this.db = getFirestore();
+    this.authAdmin = getAuth();
   }
 
   getDb(): Firestore {
     return this.db;
+  }
+
+  getAdmin(): Auth {
+    return this.authAdmin;
   }
 }
