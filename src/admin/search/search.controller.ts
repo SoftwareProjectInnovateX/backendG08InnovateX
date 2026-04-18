@@ -1,8 +1,10 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { SearchService } from '../../shared/search/search.service.js';
 import { SyncService } from '../../shared/search/sync.service.js';
+import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
 
 @Controller('api/admin/search')
+@UseGuards(FirebaseAuthGuard)
 export class AdminSearchController {
   constructor(
     private readonly searchService: SearchService,
