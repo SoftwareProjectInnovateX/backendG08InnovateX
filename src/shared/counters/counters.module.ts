@@ -5,6 +5,6 @@ import { FirebaseModule } from '../firebase/firebase.module';
 @Module({
   imports: [FirebaseModule],
   providers: [CountersService],
-  exports: [CountersService],   // exported so supplier products can use it
+  exports: [CountersService], // exported so supplier products can use it
 })
 export class CountersModule {}

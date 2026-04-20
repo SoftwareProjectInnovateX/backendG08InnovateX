@@ -7,7 +7,13 @@ export class UpdateProductDto {
 
   @IsString()
   @IsOptional()
-  @IsIn(['Medicine', 'Baby Item', 'Skincare', 'Medical Equipment', 'Supplements'])
+  @IsIn([
+    'Medicine',
+    'Baby Item',
+    'Skincare',
+    'Medical Equipment',
+    'Supplements',
+  ])
   category?: string;
 
   @IsNumber()
@@ -16,11 +22,11 @@ export class UpdateProductDto {
 
   @IsNumber()
   @IsOptional()
-  stock?: number;           // Stock Supplied to MediCareX
+  stock?: number; // Stock Supplied to MediCareX
 
   @IsNumber()
   @IsOptional()
-  minStock?: number;        // Remaining Stock with supplier
+  minStock?: number; // Remaining Stock with supplier
 
   @IsString()
   @IsOptional()

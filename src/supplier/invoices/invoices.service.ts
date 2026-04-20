@@ -5,7 +5,7 @@ import * as puppeteer from 'puppeteer';
 @Injectable()
 export class InvoicesService {
 
-  // ── POST /supplier/invoices/generate-pdf 
+  // POST /supplier/invoices/generate-pdf
   // Replaces generatePDF() in InvoicePayments.jsx
   // Returns a proper PDF buffer instead of opening a raw browser window
   async generatePdf(dto: GeneratePdfDto): Promise<Buffer> {
@@ -21,26 +21,24 @@ export class InvoicesService {
       await page.setContent(html, { waitUntil: 'networkidle0' });
 
       const pdfBuffer = await page.pdf({
-        format:            'A4',
-        printBackground:   true,
+        format: 'A4',
+        printBackground: true,
         margin: {
-          top:    '20px',
-          right:  '20px',
+          top: '20px',
+          right: '20px',
           bottom: '20px',
-          left:   '20px',
+          left: '20px',
         },
       });
 
       await browser.close();
 
       return Buffer.from(pdfBuffer);
-
     } catch (error) {
       console.error('PDF generation failed:', error);
       throw new InternalServerErrorException('Failed to generate PDF');
     }
   }
-
 
   private buildHtml(invoice: GeneratePdfDto): string {
     const itemRows = (invoice.items || [])
