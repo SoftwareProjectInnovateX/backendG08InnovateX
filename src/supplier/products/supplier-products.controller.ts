@@ -19,15 +19,19 @@ export class SupplierProductsController {
   constructor(private readonly productsService: SupplierProductsService) {}
 
   // GET /supplier/products?supplierId=xxx
-  // Called instead of fetchProducts() in ProductCatalog.jsx
   @Get()
   getProducts(@Query('supplierId') supplierId: string) {
     return this.productsService.getProducts(supplierId);
   }
 
+  // GET /supplier/products/pending?supplierId=xxx
+  // NOTE: must be declared before :id routes so Express matches it first
+  @Get('pending')
+  getPendingProducts(@Query('supplierId') supplierId: string) {
+    return this.productsService.getPendingProducts(supplierId);
+  }
+
   // POST /supplier/products
-  // Called instead of handleAddProduct() in ProductCatalog.jsx
-  // Returns { productId, productCode } — frontend shows productCode in success alert
   @Post()
   @HttpCode(HttpStatus.CREATED)
   createProduct(
@@ -39,14 +43,15 @@ export class SupplierProductsController {
   }
 
   // PATCH /supplier/products/:id
-  // Called instead of handleUpdateProduct() in ProductCatalog.jsx
   @Patch(':id')
-  updateProduct(@Param('id') productId: string, @Body() dto: UpdateProductDto) {
+  updateProduct(
+    @Param('id') productId: string,
+    @Body() dto: UpdateProductDto,
+  ) {
     return this.productsService.updateProduct(productId, dto);
   }
 
   // DELETE /supplier/products/:id
-  // Called instead of handleDeleteProduct() in ProductCatalog.jsx
   @Delete(':id')
   deleteProduct(@Param('id') productId: string) {
     return this.productsService.deleteProduct(productId);

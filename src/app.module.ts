@@ -12,6 +12,7 @@ import { UsersModule } from './admin/users/users.module.js';
 import { OrdersModule } from './admin/orders/orders.module.js';
 import { NotificationsModule } from './admin/notifications/notifications.module.js';
 import { AdminSearchModule } from './admin/search/search.module.js';
+import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module';
 
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
@@ -30,6 +31,7 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
     OrdersModule,
     NotificationsModule,
     AdminSearchModule,
+    AdminProductApprovalModule,
 
     // Supplier
     SupplierProductsModule,
