@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ChatController } from './chat.controller.js';
-import { ChatService } from './chat.service.js';
+import { ChatController } from './chat.controller';
+import { ChatService } from './chat.service';
 import { FirebaseModule } from '../../shared/firebase/firebase.module.js';
 
 @Module({

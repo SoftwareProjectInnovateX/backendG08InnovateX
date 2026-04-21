@@ -12,8 +12,12 @@ export class ChatService {
   }
 
   private readonly prescriptionDrugs = [
-    'amoxicillin', 'azithromycin', 'metformin',
-    'atorvastatin', 'adipalin', 'sergey',
+    'amoxicillin',
+    'azithromycin',
+    'metformin',
+    'atorvastatin',
+    'adipalin',
+    'sergey',
   ];
 
   private readonly systemPrompt = `
@@ -36,7 +40,6 @@ RULES — follow strictly:
     message: string,
     history: { role: string; text: string }[],
   ): Promise<{ reply: string }> {
-
     // Block prescription drugs
     const messageLower = message.toLowerCase();
     const foundDrug = this.prescriptionDrugs.find((drug) =>
@@ -53,7 +56,8 @@ RULES — follow strictly:
       const messages: Groq.Chat.ChatCompletionMessageParam[] = [
         { role: 'system', content: this.systemPrompt },
         ...history.map((msg) => ({
-          role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+          role:
+            msg.role === 'user' ? ('user' as const) : ('assistant' as const),
           content: msg.text,
         })),
         { role: 'user', content: message },
@@ -65,9 +69,10 @@ RULES — follow strictly:
         max_tokens: 500,
       });
 
-      const reply = response.choices[0]?.message?.content ?? 'Sorry, I could not generate a response.';
+      const reply =
+        response.choices[0]?.message?.content ??
+        'Sorry, I could not generate a response.';
       return { reply };
-
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('Groq error:', msg);
