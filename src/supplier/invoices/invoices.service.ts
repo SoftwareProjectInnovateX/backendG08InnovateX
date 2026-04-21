@@ -4,7 +4,8 @@ import * as puppeteer from 'puppeteer';
 
 @Injectable()
 export class InvoicesService {
-  // ── POST /supplier/invoices/generate-pdf ─────────────────────────────────
+
+  // POST /supplier/invoices/generate-pdf
   // Replaces generatePDF() in InvoicePayments.jsx
   // Returns a proper PDF buffer instead of opening a raw browser window
   async generatePdf(dto: GeneratePdfDto): Promise<Buffer> {
@@ -39,8 +40,6 @@ export class InvoicesService {
     }
   }
 
-  // ── HTML BUILDER ──────────────────────────────────────────────────────────
-  // Mirrors the exact same HTML from generatePDF() in InvoicePayments.jsx
   private buildHtml(invoice: GeneratePdfDto): string {
     const itemRows = (invoice.items || [])
       .map(
