@@ -14,9 +14,7 @@ import { GeneratePdfDto } from './dto/generate-pdf.dto';
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
-  // POST /supplier/invoices/generate-pdf
-  // Called instead of generatePDF() in InvoicePayments.jsx
-  // Returns a real downloadable PDF file
+
   @Post('generate-pdf')
   @HttpCode(HttpStatus.OK)
   async generatePdf(@Body() dto: GeneratePdfDto, @Res() res: Response) {
