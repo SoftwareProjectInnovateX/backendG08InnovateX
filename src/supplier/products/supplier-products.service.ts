@@ -124,4 +124,13 @@ export class SupplierProductsService {
 
     return { success: true };
   }
+
+  // ── GET /supplier/products/pending
+  async getPendingProducts(supplierId: string) {
+    /**
+     * Fixes the compilation error by providing a placeholder method.
+     * This will return an empty list until the actual logic is implemented.
+     */
+    return [];
+  }
 }
