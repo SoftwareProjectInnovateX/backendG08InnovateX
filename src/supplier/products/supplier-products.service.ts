@@ -12,7 +12,7 @@ export class SupplierProductsService {
     private readonly countersService: CountersService,
   ) {}
 
-  // ── GET /supplier/products 
+  // ── GET /supplier/products
   async getProducts(supplierId: string) {
     const db = this.firebaseService.getDb();
 
@@ -24,7 +24,20 @@ export class SupplierProductsService {
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 
-  // ── POST /supplier/products 
+  // ── GET /supplier/products/pending
+  async getPendingProducts(supplierId: string) {
+    const db = this.firebaseService.getDb();
+
+    const snapshot = await db.collection('products')
+      .where('supplierId', '==', supplierId)
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+
+  // ── POST /supplier/products
   async createProduct(supplierId: string, supplierName: string, dto: CreateProductDto) {
     const db = this.firebaseService.getDb();
 
@@ -43,6 +56,7 @@ export class SupplierProductsService {
       description:    dto.description  || '',
       manufacturer:   dto.manufacturer || '',
       availability:   remainingStock > 0 ? 'in stock' : 'out of stock',
+      status:         'pending',
       supplierId,
       supplierName,
       createdAt:      Timestamp.now(),
@@ -65,6 +79,7 @@ export class SupplierProductsService {
       description:    dto.description  || '',
       manufacturer:   dto.manufacturer || '',
       availability:   remainingStock > 0 ? 'in stock' : 'out of stock',
+      status:         'pending',
       lastRestocked:  Timestamp.now(),
       createdAt:      Timestamp.now(),
       updatedAt:      Timestamp.now(),
@@ -73,7 +88,7 @@ export class SupplierProductsService {
     return { productId: productRef.id, productCode };
   }
 
-  // ── PATCH /supplier/products/:id 
+  // ── PATCH /supplier/products/:id
   async updateProduct(productId: string, dto: UpdateProductDto) {
     const db = this.firebaseService.getDb();
 
@@ -108,7 +123,7 @@ export class SupplierProductsService {
     return { success: true };
   }
 
-  // ── DELETE /supplier/products/:id 
+  // ── DELETE /supplier/products/:id
   async deleteProduct(productId: string) {
     const db = this.firebaseService.getDb();
 
