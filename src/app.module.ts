@@ -14,11 +14,8 @@ import { OrdersModule } from './admin/orders/orders.module.js';
 import { NotificationsModule } from './admin/notifications/notifications.module.js';
 import { AdminSearchModule } from './admin/search/search.module.js';
 import { AccountRequestsModule } from './admin/account-requests/account-requests.module.js';
-<<<<<<< HEAD
 import { ChatModule } from './admin/chat/chat.module.js';
-=======
 import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module';
->>>>>>> f597565319a22a51de2f9a5c154532518d708af4
 
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
@@ -39,11 +36,8 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
     NotificationsModule,
     AdminSearchModule,
     AccountRequestsModule,
-<<<<<<< HEAD
     ChatModule,
-=======
     AdminProductApprovalModule,
->>>>>>> f597565319a22a51de2f9a5c154532518d708af4
 
     // Supplier
     SupplierProductsModule,
