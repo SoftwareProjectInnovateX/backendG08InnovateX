@@ -6,12 +6,14 @@ import { AppService } from './app.service.js';
 // Shared
 import { FirebaseModule } from './shared/firebase/firebase.module.js';
 import { CountersModule } from './shared/counters/counters.module.js';
+import { MailModule } from './shared/mail/mail.module.js';
 
 // Admin
 import { UsersModule } from './admin/users/users.module.js';
 import { OrdersModule } from './admin/orders/orders.module.js';
 import { NotificationsModule } from './admin/notifications/notifications.module.js';
 import { AdminSearchModule } from './admin/search/search.module.js';
+import { AccountRequestsModule } from './admin/account-requests/account-requests.module.js';
 import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module';
 
 // Supplier
@@ -25,12 +27,14 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
     // Shared
     FirebaseModule,
     CountersModule,
+    MailModule,
 
     // Admin
     UsersModule,
     OrdersModule,
     NotificationsModule,
     AdminSearchModule,
+    AccountRequestsModule,
     AdminProductApprovalModule,
 
     // Supplier
