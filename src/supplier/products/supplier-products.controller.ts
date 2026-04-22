@@ -19,23 +19,26 @@ export class SupplierProductsController {
   constructor(private readonly productsService: SupplierProductsService) {}
 
   // GET /supplier/products?supplierId=xxx
+  // Returns approved products shown in the "Active Products" tab
   @Get()
   getProducts(@Query('supplierId') supplierId: string) {
     return this.productsService.getProducts(supplierId);
   }
 
   // GET /supplier/products/pending?supplierId=xxx
-  // NOTE: must be declared before :id routes so Express matches it first
+  // Returns pending/rejected submissions shown in "Pending Approval" tab
+  // NOTE: declared before :id so Express matches it first
   @Get('pending')
   getPendingProducts(@Query('supplierId') supplierId: string) {
     return this.productsService.getPendingProducts(supplierId);
   }
 
-  // POST /supplier/products
+  // POST /supplier/products?supplierId=xxx&supplierName=xxx
+  // Submits a new product for admin approval → saved to pendingProducts
   @Post()
   @HttpCode(HttpStatus.CREATED)
   createProduct(
-    @Query('supplierId') supplierId: string,
+    @Query('supplierId')   supplierId:   string,
     @Query('supplierName') supplierName: string,
     @Body() dto: CreateProductDto,
   ) {
@@ -43,6 +46,7 @@ export class SupplierProductsController {
   }
 
   // PATCH /supplier/products/:id
+  // Updates an already-approved product
   @Patch(':id')
   updateProduct(
     @Param('id') productId: string,
@@ -52,6 +56,7 @@ export class SupplierProductsController {
   }
 
   // DELETE /supplier/products/:id
+  // Deletes an approved product from both products + adminProducts
   @Delete(':id')
   deleteProduct(@Param('id') productId: string) {
     return this.productsService.deleteProduct(productId);
