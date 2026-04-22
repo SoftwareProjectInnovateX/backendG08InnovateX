@@ -1,18 +1,18 @@
-import { Injectable } from '@nestjs/common';
-import { FirebaseService } from '../../shared/firebase/firebase.service.js';
-import { CountersService } from '../../shared/counters/counters.service.js';
-import { CreateProductDto } from './dto/create-product.dto.js';
-import { UpdateProductDto } from './dto/update-product.dto.js';
+// supplier-products.service.ts
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { FirebaseService } from '../../shared/firebase/firebase.service';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 import { Timestamp } from 'firebase-admin/firestore';
 
 @Injectable()
 export class SupplierProductsService {
   constructor(
     private readonly firebaseService: FirebaseService,
-    private readonly countersService: CountersService,
   ) {}
 
-  // ── GET /supplier/products
+  // ── GET /supplier/products?supplierId=xxx
+  // Returns only APPROVED products (live in 'products' collection)
   async getProducts(supplierId: string) {
     const db = this.firebaseService.getDb();
 
@@ -26,6 +26,7 @@ export class SupplierProductsService {
   }
 
   // ── GET /supplier/products/pending?supplierId=xxx
+  // Returns pending AND rejected submissions from 'pendingProducts' collection
   async getPendingProducts(supplierId: string) {
     const db = this.firebaseService.getDb();
 
@@ -35,11 +36,22 @@ export class SupplierProductsService {
       .orderBy('createdAt', 'desc')
       .get();
 
-    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return snapshot.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        // Serialize Firestore Timestamps so they reach the frontend safely
+        createdAt:  data.createdAt  ? { _seconds: data.createdAt.seconds }  : null,
+        approvedAt: data.approvedAt ? { _seconds: data.approvedAt.seconds } : null,
+        rejectedAt: data.rejectedAt ? { _seconds: data.rejectedAt.seconds } : null,
+      };
+    });
   }
 
   // ── POST /supplier/products
-  // Now saves to `pendingProducts` and waits for admin approval
+  // Saves to 'pendingProducts' with status: 'pending'
+  // Admin will move it to 'products' + 'adminProducts' upon approval
   async createProduct(
     supplierId: string,
     supplierName: string,
@@ -47,63 +59,60 @@ export class SupplierProductsService {
   ) {
     const db = this.firebaseService.getDb();
 
-    const suppliedStock = dto.stock ?? 0;
-    const remainingStock = dto.minStock ?? 0;
+    const suppliedStock  = dto.stock    || 0;
+    const remainingStock = dto.minStock || 0;
 
     const pendingProduct = {
-      productName: dto.productName,
-      category: dto.category,
+      productName:    dto.productName,
+      category:       dto.category,
       wholesalePrice: dto.wholesalePrice,
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: dto.description || '',
-      manufacturer: dto.manufacturer || '',
+      stock:          suppliedStock,
+      minStock:       remainingStock,
+      description:    dto.description  || '',
+      manufacturer:   dto.manufacturer || '',
       supplierId,
       supplierName,
-      status: 'pending',          // admin must approve
+      status:    'pending',   // ← admin reads this
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
 
-    const pendingRef = await db.collection('pendingProducts').add(pendingProduct);
+    // Save ONLY to pendingProducts — admin approval moves it to products + adminProducts
+    const docRef = await db.collection('pendingProducts').add(pendingProduct);
 
-    // Notify admin about new product awaiting approval
-    await db.collection('notifications').add({
-      type: 'PRODUCT_PENDING_APPROVAL',
-      recipientType: 'admin',
-      pendingProductId: pendingRef.id,
-      productName: dto.productName,
-      supplierId,
-      supplierName,
-      message: `New product "${dto.productName}" submitted by ${supplierName} — awaiting approval.`,
-      read: false,
-      createdAt: Timestamp.now(),
-    });
-
-    return { pendingProductId: pendingRef.id, status: 'pending' };
+    return { success: true, pendingProductId: docRef.id };
   }
 
   // ── PATCH /supplier/products/:id
+  // Only approved products (in 'products' collection) can be edited
   async updateProduct(productId: string, dto: UpdateProductDto) {
     const db = this.firebaseService.getDb();
 
-    const suppliedStock = dto.stock ?? 0;
+    const productRef  = db.collection('products').doc(productId);
+    const productSnap = await productRef.get();
+
+    if (!productSnap.exists) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const suppliedStock  = dto.stock    ?? 0;
     const remainingStock = dto.minStock ?? 0;
 
     const updatedData = {
-      ...(dto.productName && { productName: dto.productName }),
-      ...(dto.category && { category: dto.category }),
+      ...(dto.productName    && { productName:    dto.productName }),
+      ...(dto.category       && { category:       dto.category }),
       ...(dto.wholesalePrice && { wholesalePrice: dto.wholesalePrice }),
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: dto.description ?? '',
+      stock:        suppliedStock,
+      minStock:     remainingStock,
+      description:  dto.description  ?? '',
       manufacturer: dto.manufacturer ?? '',
-      availability: remainingStock > 0 ? 'in stock' : 'out of stock',
-      updatedAt: Timestamp.now(),
+      availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
+      updatedAt:    Timestamp.now(),
     };
 
-    await db.collection('products').doc(productId).update(updatedData);
+    await productRef.update(updatedData);
 
+    // Keep adminProducts in sync
     const adminSnap = await db
       .collection('adminProducts')
       .where('productId', '==', productId)
@@ -123,11 +132,13 @@ export class SupplierProductsService {
   }
 
   // ── DELETE /supplier/products/:id
+  // Only approved products can be deleted
   async deleteProduct(productId: string) {
     const db = this.firebaseService.getDb();
 
     await db.collection('products').doc(productId).delete();
 
+    // Remove from adminProducts too
     const adminSnap = await db
       .collection('adminProducts')
       .where('productId', '==', productId)
@@ -142,7 +153,4 @@ export class SupplierProductsService {
 
     return { success: true };
   }
-
-  // ── POST /supplier/products/pending/:id/approve  (called by admin service — see AdminProductApprovalService)
-  // Moved to AdminProductApprovalService for separation of concerns
 }
