@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsIn } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsIn, IsNotEmpty } from 'class-validator';
 
 export class UpdateProductDto {
   @IsString()
@@ -26,9 +26,15 @@ export class UpdateProductDto {
 
   @IsNumber()
   @IsOptional()
+<<<<<<< HEAD
   minStock?: number; // Remaining Stock with supplier
 
   @IsString()
+=======
+  minStock?: number;     
+  
+ 
+>>>>>>> product-handling
   @IsOptional()
   description?: string;
 
