@@ -11,7 +11,7 @@ export class SyncService {
 
   async syncAllProducts(): Promise<unknown> {
     const db = this.firebaseService.getDb(); // ← changed from getFirestore()
-    const snapshot = await db.collection('adminProducts').get();
+    const snapshot = await db.collection('pharmacistProducts').get();
     console.log(`\n🔄 Starting sync of ${snapshot.size} products...\n`);
 
     let success = 0;
