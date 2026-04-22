@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -20,9 +22,18 @@ import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
 import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders.module.js';
 
+// Pharmacist
+import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+
+    // Serve uploaded prescription images statically
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'),
+      serveRoot: '/uploads',
+    }),
 
     // Shared
     FirebaseModule,
@@ -40,6 +51,9 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
     // Supplier
     SupplierProductsModule,
     PurchaseOrdersModule,
+
+    // Pharmacist
+    PrescriptionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
