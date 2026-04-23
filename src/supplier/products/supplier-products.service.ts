@@ -24,6 +24,25 @@ export class SupplierProductsService {
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 
+  // ── GET /supplier/products/pending
+  async getPendingProducts(supplierId: string) {
+    const db = this.firebaseService.getDb();
+
+    const snapshot = await db.collection('pendingProducts')
+      .where('supplierId', '==', supplierId)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    return snapshot.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        createdAt: data.createdAt ? { _seconds: data.createdAt.seconds } : null,
+      };
+    });
+  }
+
   // ── POST /supplier/products 
   async createProduct(supplierId: string, supplierName: string, dto: CreateProductDto) {
     const db = this.firebaseService.getDb();

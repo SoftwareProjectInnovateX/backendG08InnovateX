@@ -18,6 +18,10 @@ import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
 import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders.module.js';
 
+// Pharmacist
+import { PharmacistModule } from './pharmacist/pharmacist.module.js';
+
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -36,6 +40,9 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
     // Supplier
     SupplierProductsModule,
     PurchaseOrdersModule,
+
+    // Pharmacist
+    PharmacistModule,
   ],
   controllers: [AppController],
   providers: [AppService],
