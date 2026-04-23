@@ -164,4 +164,141 @@ export class MailService {
       `,
     });
   }
+
+  async sendProductApprovedEmail(data: {
+  to: string;
+  supplierName: string;
+  productName: string;
+  productCode: string;
+}): Promise<void> {
+  await this.mailer.sendMail({
+    to: data.to,
+    subject: `Product Approved: ${data.productName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f9ff; margin: 0; padding: 0; }
+          .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff;
+                     border-radius: 16px; overflow: hidden;
+                     box-shadow: 0 4px 24px rgba(30,64,175,0.10); }
+          .header  { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+                     padding: 36px 40px; text-align: center; }
+          .header h1 { color: #ffffff; margin: 0; font-size: 26px; letter-spacing: 1px; }
+          .header p  { color: #bfdbfe; margin: 6px 0 0; font-size: 14px; }
+          .body    { padding: 36px 40px; }
+          .greeting { font-size: 18px; font-weight: 600; color: #1e3a8a; margin-bottom: 12px; }
+          .message  { color: #475569; font-size: 15px; line-height: 1.7; }
+          .badge   { display: inline-block; background: #dcfce7; color: #16a34a;
+                     font-size: 12px; font-weight: 700; padding: 4px 12px;
+                     border-radius: 99px; letter-spacing: 0.5px; margin-bottom: 16px; }
+          .credentials { background: #f0fdf4; border: 1.5px solid #bbf7d0;
+                         border-radius: 10px; padding: 20px 24px; margin: 24px 0; }
+          .credentials p  { margin: 6px 0; font-size: 14px; color: #334155; }
+          .credentials strong { color: #15803d; }
+          .footer  { background: #f8fafc; padding: 20px 40px; text-align: center;
+                     font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="header">
+            <h1>MediCareX</h1>
+            <p>Pharmacy Supply Chain Management</p>
+          </div>
+          <div class="body">
+            <span class="badge">Product Approved</span>
+            <p class="greeting">Great news, ${data.supplierName}!</p>
+            <p class="message">
+              Your product submission has been <strong style="color:#16a34a;">approved</strong>
+              by our admin team and is now live in the pharmacist inventory system.
+            </p>
+            <div class="credentials">
+              <p><strong>Product Name:</strong> ${data.productName}</p>
+              <p><strong>Product Code:</strong>
+                <code style="background:#dcfce7;padding:2px 8px;border-radius:4px;
+                             font-size:14px;color:#15803d;">${data.productCode}</code>
+              </p>
+            </div>
+            <p class="message">You can track your product's status from your supplier dashboard.</p>
+          </div>
+          <div class="footer">
+            ${new Date().getFullYear()} MediCareX · This is an automated message, please do not reply.
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+}
+
+async sendProductRejectedEmail(data: {
+  to: string;
+  supplierName: string;
+  productName: string;
+  reason?: string;
+}): Promise<void> {
+  await this.mailer.sendMail({
+    to: data.to,
+    subject: `Product Submission Update: ${data.productName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f9ff; margin: 0; padding: 0; }
+          .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff;
+                     border-radius: 16px; overflow: hidden;
+                     box-shadow: 0 4px 24px rgba(30,64,175,0.10); }
+          .header  { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+                     padding: 36px 40px; text-align: center; }
+          .header h1 { color: #ffffff; margin: 0; font-size: 26px; letter-spacing: 1px; }
+          .header p  { color: #bfdbfe; margin: 6px 0 0; font-size: 14px; }
+          .body    { padding: 36px 40px; }
+          .greeting { font-size: 18px; font-weight: 600; color: #1e3a8a; margin-bottom: 12px; }
+          .message  { color: #475569; font-size: 15px; line-height: 1.7; }
+          .badge   { display: inline-block; background: #fee2e2; color: #b91c1c;
+                     font-size: 12px; font-weight: 700; padding: 4px 12px;
+                     border-radius: 99px; letter-spacing: 0.5px; margin-bottom: 16px; }
+          .reason-box { background: #fff7ed; border-left: 4px solid #f97316;
+                        padding: 14px 18px; border-radius: 6px; margin: 20px 0;
+                        font-size: 14px; color: #7c2d12; line-height: 1.6; }
+          .footer  { background: #f8fafc; padding: 20px 40px; text-align: center;
+                     font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="header">
+            <h1>MediCareX</h1>
+            <p>Pharmacy Supply Chain Management</p>
+          </div>
+          <div class="body">
+            <span class="badge">Product Not Approved</span>
+            <p class="greeting">Dear ${data.supplierName},</p>
+            <p class="message">
+              Your submission for <strong>${data.productName}</strong> has been
+              <strong style="color:#dc2626;">rejected</strong> by our admin team.
+            </p>
+            ${data.reason ? `
+            <div class="reason-box">
+              <strong>Reason:</strong> ${data.reason}
+            </div>` : ''}
+            <p class="message">
+              Please review the feedback, make the necessary corrections, and resubmit
+              your product from your supplier dashboard.
+            </p>
+          </div>
+          <div class="footer">
+            ${new Date().getFullYear()} MediCareX · This is an automated message, please do not reply.
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+}
 }

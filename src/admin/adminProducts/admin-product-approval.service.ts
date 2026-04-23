@@ -3,19 +3,20 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service.js';
 import { CountersService } from '../../shared/counters/counters.service.js';
 import { Timestamp } from 'firebase-admin/firestore';
+import { MailService } from '../../shared/mail/mail.service.js';
 
 @Injectable()
 export class AdminProductApprovalService {
   constructor(
     private readonly firebaseService: FirebaseService,
     private readonly countersService: CountersService,
+    private readonly mailService: MailService,
   ) {}
 
   // ── GET /admin/pending-products
   async getAllPending() {
     const db = this.firebaseService.getDb();
 
-    // Returns ALL statuses (pending, approved, rejected) so admin can see full history
     const snapshot = await db
       .collection('pendingProducts')
       .orderBy('createdAt', 'desc')
@@ -26,7 +27,6 @@ export class AdminProductApprovalService {
       return {
         id: d.id,
         ...data,
-        // Serialize Firestore Timestamps to plain objects for JSON transport
         createdAt:  data.createdAt  ? { _seconds: data.createdAt.seconds }  : null,
         approvedAt: data.approvedAt ? { _seconds: data.approvedAt.seconds } : null,
         rejectedAt: data.rejectedAt ? { _seconds: data.rejectedAt.seconds } : null,
@@ -112,6 +112,16 @@ export class AdminProductApprovalService {
       createdAt: Timestamp.now(),
     });
 
+    // Send approval email to supplier
+    if (data.supplierEmail) {
+      await this.mailService.sendProductApprovedEmail({
+        to:           data.supplierName,
+        supplierName: data.supplierName,
+        productName:  data.productName,
+        productCode,
+      });
+    }
+
     return { success: true, productId: productRef.id, productCode };
   }
 
@@ -148,6 +158,16 @@ export class AdminProductApprovalService {
       read:      false,
       createdAt: Timestamp.now(),
     });
+
+    // Send rejection email to supplier
+    if (data.supplierEmail) {
+      await this.mailService.sendProductRejectedEmail({
+        to:           data.supplierName,
+        supplierName: data.supplierName,
+        productName:  data.productName,
+        reason,
+      });
+    }
 
     return { success: true };
   }
