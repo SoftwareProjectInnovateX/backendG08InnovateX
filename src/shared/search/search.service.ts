@@ -75,15 +75,6 @@ export class SearchService implements OnModuleInit {
         includeMetadata: true,
       });
 
-      console.log(
-        'Pinecone matches:',
-        pineconeResults.matches?.map((m) => ({
-          id: m.id,
-          score: m.score,
-          name: m.metadata?.productName
-        })),
-      );
-
       if (!pineconeResults.matches?.length) return [];
 
       const db = this.firebaseService.getDb(); // ← changed from getFirestore()
