@@ -28,14 +28,12 @@ export class SyncService {
         });
         success++;
         console.log(
-          `  ✅ (${success}/${snapshot.size}) ${String(product['productName'] ?? '')}`,
+          `  ✅ (${success}/${snapshot.size}) ${String(product['name'] ?? '')}`,
         );
       } catch (err: unknown) {
         failed++;
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(
-          `  ❌ Failed: ${String(product['productName'] ?? '')} — ${msg}`,
-        );
+        console.error(`  ❌ Failed: ${String(product['name'] ?? '')} — ${msg}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
