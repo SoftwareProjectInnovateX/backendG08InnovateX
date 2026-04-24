@@ -22,13 +22,12 @@ export class UpdateProductDto {
 
   @IsNumber()
   @IsOptional()
-  stock?: number; // Stock Supplied to MediCareX
+  stock?: number;
 
   @IsNumber()
   @IsOptional()
-  minStock?: number; // Remaining Stock with supplier
+  minStock?: number;
 
-  @IsString()
   @IsOptional()
   description?: string;
 

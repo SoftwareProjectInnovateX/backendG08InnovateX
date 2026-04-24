@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+// supplier-products.service.ts
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
-import { CountersService } from '../../shared/counters/counters.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Timestamp } from 'firebase-admin/firestore';
@@ -9,10 +9,10 @@ import { Timestamp } from 'firebase-admin/firestore';
 export class SupplierProductsService {
   constructor(
     private readonly firebaseService: FirebaseService,
-    private readonly countersService: CountersService,
   ) {}
 
-  // ── GET /supplier/products
+  // ── GET /supplier/products?supplierId=xxx
+  // Returns only APPROVED products (live in 'products' collection)
   async getProducts(supplierId: string) {
     const db = this.firebaseService.getDb();
 
@@ -25,7 +25,32 @@ export class SupplierProductsService {
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 
+  // ── GET /supplier/products/pending?supplierId=xxx
+  // Returns pending AND rejected submissions from 'pendingProducts' collection
+  async getPendingProducts(supplierId: string) {
+    const db = this.firebaseService.getDb();
+
+    const snapshot = await db.collection('products')
+      .where('supplierId', '==', supplierId)
+      .where('status', '==', 'pending')
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    return snapshot.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        createdAt:  data.createdAt  ? { _seconds: data.createdAt.seconds }  : null,
+        approvedAt: data.approvedAt ? { _seconds: data.approvedAt.seconds } : null,
+        rejectedAt: data.rejectedAt ? { _seconds: data.rejectedAt.seconds } : null,
+      };
+    });
+  }
+
   // ── POST /supplier/products
+  // Saves to 'pendingProducts' with status: 'pending'
+  // Admin will move it to 'products' + 'adminProducts' upon approval
   async createProduct(
     supplierId: string,
     supplierName: string,
@@ -33,56 +58,42 @@ export class SupplierProductsService {
   ) {
     const db = this.firebaseService.getDb();
 
-    const productCode = await this.countersService.generateProductCode();
-
     const suppliedStock = dto.stock || 0;
     const remainingStock = dto.minStock || 0;
 
-    const newProduct = {
-      productName: dto.productName,
-      productCode,
-      category: dto.category,
+    const pendingProduct = {
+      productName:    dto.productName,
+      category:       dto.category,
       wholesalePrice: dto.wholesalePrice,
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: dto.description || '',
-      manufacturer: dto.manufacturer || '',
-      availability: remainingStock > 0 ? 'in stock' : 'out of stock',
+      stock:          suppliedStock,
+      minStock:       remainingStock,
+      description:    dto.description  || '',
+      manufacturer:   dto.manufacturer || '',
       supplierId,
       supplierName,
+      status:    'pending',
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
 
-    const productRef = await db.collection('products').add(newProduct);
+    const docRef = await db.collection('pendingProducts').add(pendingProduct);
 
-    await db.collection('adminProducts').add({
-      productId: productRef.id,
-      supplierId,
-      supplierName,
-      productName: dto.productName,
-      productCode,
-      category: dto.category,
-      wholesalePrice: dto.wholesalePrice,
-      retailPrice: (dto.wholesalePrice ?? 0) * 1.2,
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: dto.description || '',
-      manufacturer: dto.manufacturer || '',
-      availability: remainingStock > 0 ? 'in stock' : 'out of stock',
-      lastRestocked: Timestamp.now(),
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
-
-    return { productId: productRef.id, productCode };
+    return { success: true, pendingProductId: docRef.id };
   }
 
   // ── PATCH /supplier/products/:id
+  // Only approved products (in 'products' collection) can be edited
   async updateProduct(productId: string, dto: UpdateProductDto) {
     const db = this.firebaseService.getDb();
 
-    const suppliedStock = dto.stock ?? 0;
+    const productRef  = db.collection('products').doc(productId);
+    const productSnap = await productRef.get();
+
+    if (!productSnap.exists) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const suppliedStock  = dto.stock    ?? 0;
     const remainingStock = dto.minStock ?? 0;
 
     const updatedData = {
@@ -93,12 +104,13 @@ export class SupplierProductsService {
       minStock: remainingStock,
       description: dto.description ?? '',
       manufacturer: dto.manufacturer ?? '',
-      availability: remainingStock > 0 ? 'in stock' : 'out of stock',
-      updatedAt: Timestamp.now(),
+      availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
+      updatedAt:    Timestamp.now(),
     };
 
-    await db.collection('products').doc(productId).update(updatedData);
+    await productRef.update(updatedData);
 
+    // Keep adminProducts in sync
     const adminSnap = await db
       .collection('adminProducts')
       .where('productId', '==', productId)
@@ -118,11 +130,13 @@ export class SupplierProductsService {
   }
 
   // ── DELETE /supplier/products/:id
+  // Only approved products can be deleted
   async deleteProduct(productId: string) {
     const db = this.firebaseService.getDb();
 
     await db.collection('products').doc(productId).delete();
 
+    // Remove from adminProducts too
     const adminSnap = await db
       .collection('adminProducts')
       .where('productId', '==', productId)
@@ -133,14 +147,5 @@ export class SupplierProductsService {
     }
 
     return { success: true };
-  }
-  async getPendingProducts(supplierId: string) {
-    const db = this.firebaseService.getDb();
-    const snapshot = await db
-      .collection('adminProducts')
-      .where('supplierId', '==', supplierId)
-      .where('status', '==', 'pending')
-      .get();
-    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 }

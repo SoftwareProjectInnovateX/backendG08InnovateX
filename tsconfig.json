@@ -22,6 +22,11 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-    "types": ["jest"]
-  }
+    "types": ["jest", "node"]  // ← added "node"
+  },
+  "exclude": [
+    "node_modules",
+    "src/customer/cartRoute.ts",         // ← exclude Next.js file
+    "src/customer/upload-prescription.ts" // ← exclude Next.js file
+  ]
 }
