@@ -77,7 +77,7 @@ export class SearchService implements OnModuleInit {
 
       if (!pineconeResults.matches?.length) return [];
 
-      const db = this.firebaseService.getDb(); // ← changed from getFirestore()
+      const db = this.firebaseService.getDb();
       const results: Product[] = [];
 
       for (const match of pineconeResults.matches) {
