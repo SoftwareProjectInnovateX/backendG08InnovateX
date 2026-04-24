@@ -16,6 +16,7 @@ import { OrdersModule } from './admin/orders/orders.module.js';
 import { NotificationsModule } from './admin/notifications/notifications.module.js';
 import { AdminSearchModule } from './admin/search/search.module.js';
 import { AccountRequestsModule } from './admin/account-requests/account-requests.module.js';
+import { ChatModule } from './admin/chat/chat.module.js';
 import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module';
 
 // Supplier
@@ -49,6 +50,7 @@ import { CustomerOrdersModule } from './customer/orders/orders.module.js';
     NotificationsModule,
     AdminSearchModule,
     AccountRequestsModule,
+    ChatModule,
     AdminProductApprovalModule,
 
     // Supplier
