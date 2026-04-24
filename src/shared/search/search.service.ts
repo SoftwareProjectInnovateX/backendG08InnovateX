@@ -5,7 +5,7 @@
 
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Pinecone, Index, RecordMetadata } from '@pinecone-database/pinecone';
-import { FirebaseService } from '../firebase/firebase.service.js';
+import { FirebaseService } from '../../shared/firebase/firebase.service.js';
 
 const { pipeline } = require('@xenova/transformers');
 
@@ -34,6 +34,9 @@ export class SearchService implements OnModuleInit {
   private pinecone!: Pinecone;
   private index!: Index<RecordMetadata>;
   private embedder: any = null;
+  private productCache: any[] = [];
+  private cacheTime: number = 0;
+  private readonly CACHE_DURATION = 5 * 60 * 1000;
 
   constructor(private firebaseService: FirebaseService) {}
 
@@ -105,15 +108,26 @@ export class SearchService implements OnModuleInit {
 
   private async keywordSearch(query: string): Promise<Product[]> {
     try {
-      const db = this.firebaseService.getDb(); // ← changed from getFirestore()
-      const queryLower = query.toLowerCase();
-      const snapshot = await db.collection('pharmacistProducts').get();
+      const now = Date.now();
+      const db = this.firebaseService.getDb();
 
-      return snapshot.docs
-        .map((doc) => ({
+      if (
+        this.productCache.length === 0 ||
+        now - this.cacheTime > this.CACHE_DURATION
+      ) {
+        console.log('📦 Fetching products from Firestore...');
+        const snapshot = await db.collection('pharmacistProducts').get();
+        this.productCache = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...(doc.data() as Record<string, unknown>),
-        }))
+        }));
+        this.cacheTime = now;
+        console.log(`✅ Cached ${this.productCache.length} products`);
+      }
+
+      const queryLower = query.toLowerCase();
+
+      return this.productCache
         .filter((product) => {
           const p = product as Product;
           return (

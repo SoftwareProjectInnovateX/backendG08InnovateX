@@ -34,4 +34,10 @@ export class FirebaseService {
     this.ensureInitialized();
     return this.authAdmin;
   }
+
+  getTimestamp() {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const admin = require('firebase-admin');
+    return admin.firestore.FieldValue.serverTimestamp();
+  }
 }
