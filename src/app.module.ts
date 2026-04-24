@@ -26,6 +26,9 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
 // Pharmacist
 import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.module.js';
 
+import { CartModule } from './customer/cart/cart.module.js';
+import { CustomerOrdersModule } from './customer/orders/orders.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -56,6 +59,10 @@ import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.mo
 
     // Pharmacist
     PrescriptionsModule,
+
+    // Customer
+    CartModule,
+    CustomerOrdersModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -112,14 +112,16 @@ export class AdminProductApprovalService {
       createdAt: Timestamp.now(),
     });
 
-    // Send approval email to supplier
+    // ✅ Fixed: use data.supplierEmail for the `to` field
     if (data.supplierEmail) {
       await this.mailService.sendProductApprovedEmail({
-        to:           data.supplierName,
+        to:           data.supplierEmail,
         supplierName: data.supplierName,
         productName:  data.productName,
         productCode,
       });
+    } else {
+      console.warn(`[ApproveProduct] No supplierEmail found for supplierId: ${data.supplierId}. Email not sent.`);
     }
 
     return { success: true, productId: productRef.id, productCode };
@@ -159,14 +161,16 @@ export class AdminProductApprovalService {
       createdAt: Timestamp.now(),
     });
 
-    // Send rejection email to supplier
+    // ✅ Fixed: use data.supplierEmail for the `to` field
     if (data.supplierEmail) {
       await this.mailService.sendProductRejectedEmail({
-        to:           data.supplierName,
+        to:           data.supplierEmail,
         supplierName: data.supplierName,
         productName:  data.productName,
         reason,
       });
+    } else {
+      console.warn(`[RejectProduct] No supplierEmail found for supplierId: ${data.supplierId}. Email not sent.`);
     }
 
     return { success: true };
