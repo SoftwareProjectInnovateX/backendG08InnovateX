@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SearchService } from './search.service.js';
-import { FirebaseService } from '../firebase/firebase.service.js'; // ← updated path
+import { FirebaseService } from '../../shared/firebase/firebase.service.js';
 
 @Injectable()
 export class SyncService {
