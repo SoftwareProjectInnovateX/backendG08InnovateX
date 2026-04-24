@@ -11,6 +11,8 @@ async function bootstrap() {
     credentials: true,
   });
 
+  app.setGlobalPrefix('api');
+
   await app.listen(5000);
   console.log('Backend running on http://localhost:5000');
 }
