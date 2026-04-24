@@ -1,17 +1,17 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
-
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getAuth, Auth } from 'firebase-admin/auth';
 
 @Injectable()
-export class FirebaseService implements OnModuleInit {
-  private db!: Firestore;
-  private authAdmin!: Auth;
+export class FirebaseService {
+  private db: Firestore;
+  private authAdmin: Auth;
 
-  onModuleInit() {
+  constructor() {
+    // Initialize in constructor so it's ready before any service uses it
     if (!getApps().length) {
       initializeApp({
         credential: cert({
@@ -25,8 +25,8 @@ export class FirebaseService implements OnModuleInit {
     this.authAdmin = getAuth();
   }
 
-  getDb() {
-    return getFirestore();
+  getDb(): Firestore {
+    return this.db; // ✅ return the stored instance, not a fresh getFirestore() call
   }
 
   getAdmin(): Auth {
