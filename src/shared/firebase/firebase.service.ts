@@ -1,5 +1,6 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
+
 import { Injectable } from '@nestjs/common';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
@@ -7,11 +8,10 @@ import { getAuth, Auth } from 'firebase-admin/auth';
 
 @Injectable()
 export class FirebaseService {
-  private db: Firestore;
-  private authAdmin: Auth;
+  private db!: Firestore;
+  private authAdmin!: Auth;
 
-  constructor() {
-    // Initialize in constructor so it's ready before any service uses it
+  private ensureInitialized() {
     if (!getApps().length) {
       initializeApp({
         credential: cert({
@@ -21,15 +21,17 @@ export class FirebaseService {
         }),
       });
     }
-    this.db = getFirestore();
-    this.authAdmin = getAuth();
+    if (!this.db) this.db = getFirestore();
+    if (!this.authAdmin) this.authAdmin = getAuth();
   }
 
   getDb(): Firestore {
-    return this.db; // ✅ return the stored instance, not a fresh getFirestore() call
+    this.ensureInitialized();
+    return this.db;
   }
 
   getAdmin(): Auth {
+    this.ensureInitialized();
     return this.authAdmin;
   }
 }

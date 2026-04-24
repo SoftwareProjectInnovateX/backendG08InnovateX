@@ -16,7 +16,8 @@ export class SupplierProductsService {
   async getProducts(supplierId: string) {
     const db = this.firebaseService.getDb();
 
-    const snapshot = await db.collection('products')
+    const snapshot = await db
+      .collection('products')
       .where('supplierId', '==', supplierId)
       .orderBy('createdAt', 'desc')
       .get();
@@ -57,7 +58,7 @@ export class SupplierProductsService {
   ) {
     const db = this.firebaseService.getDb();
 
-    const suppliedStock  = dto.stock    || 0;
+    const suppliedStock = dto.stock || 0;
     const remainingStock = dto.minStock || 0;
 
     const pendingProduct = {
@@ -96,12 +97,12 @@ export class SupplierProductsService {
     const remainingStock = dto.minStock ?? 0;
 
     const updatedData = {
-      ...(dto.productName    && { productName:    dto.productName }),
-      ...(dto.category       && { category:       dto.category }),
+      ...(dto.productName && { productName: dto.productName }),
+      ...(dto.category && { category: dto.category }),
       ...(dto.wholesalePrice && { wholesalePrice: dto.wholesalePrice }),
-      stock:        suppliedStock,
-      minStock:     remainingStock,
-      description:  dto.description  ?? '',
+      stock: suppliedStock,
+      minStock: remainingStock,
+      description: dto.description ?? '',
       manufacturer: dto.manufacturer ?? '',
       availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
       updatedAt:    Timestamp.now(),
@@ -116,10 +117,13 @@ export class SupplierProductsService {
       .get();
 
     if (!adminSnap.empty) {
-      await db.collection('adminProducts').doc(adminSnap.docs[0].id).update({
-        ...updatedData,
-        ...(dto.wholesalePrice && { retailPrice: dto.wholesalePrice * 1.2 }),
-      });
+      await db
+        .collection('adminProducts')
+        .doc(adminSnap.docs[0].id)
+        .update({
+          ...updatedData,
+          ...(dto.wholesalePrice && { retailPrice: dto.wholesalePrice * 1.2 }),
+        });
     }
 
     return { success: true };
