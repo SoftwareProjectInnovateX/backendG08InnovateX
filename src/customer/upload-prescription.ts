@@ -23,7 +23,8 @@ import * as admin from 'firebase-admin';
 interface PrescriptionBody {
   customerName: string;
   customerPhone: string;
-  customerAddress: string;
+  customerAddress?: string;
+  userId?: string;
 }
 
 interface MulterFile {
@@ -62,9 +63,9 @@ export class PrescriptionController {
     }
 
     // ✅ Validate required body fields
-    const { customerName, customerPhone, customerAddress } = body;
-    if (!customerName || !customerPhone || !customerAddress) {
-      throw new BadRequestException('customerName, customerPhone, and customerAddress are required');
+    const { customerName, customerPhone, customerAddress, userId } = body;
+    if (!customerName || !customerPhone) {
+      throw new BadRequestException('customerName and customerPhone are required');
     }
 
     // ✅ Validate env variables
@@ -106,7 +107,8 @@ export class PrescriptionController {
         status: 'pending',
         customerName,
         customerPhone,
-        customerAddress,
+        customerAddress: customerAddress || '',
+        userId: userId || null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
@@ -157,7 +159,8 @@ export class PrescriptionController {
           status: 'pending',
           customerName,
           customerPhone,
-          customerAddress,
+          customerAddress: customerAddress || '',
+          userId: userId || null,
           createdAt: new Date().toISOString(),
         },
       };

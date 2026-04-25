@@ -7,7 +7,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { PrescriptionsService } from './prescriptions.service';
 
-@Controller('api/prescriptions')
+@Controller('prescriptions')
 export class PrescriptionsController {
   constructor(private readonly prescriptionsService: PrescriptionsService) {}
 
@@ -39,11 +39,11 @@ export class PrescriptionsController {
     return this.prescriptionsService.getAllPrescriptions();
   }
 
-  @Patch(':id/status')
-  async updateStatus(
+  @Patch(':id')
+  async update(
     @Param('id') id: string,
-    @Body('status') status: string,
+    @Body() updateData: any,
   ) {
-    return this.prescriptionsService.updateStatus(id, status);
+    return this.prescriptionsService.updatePrescription(id, updateData);
   }
 }

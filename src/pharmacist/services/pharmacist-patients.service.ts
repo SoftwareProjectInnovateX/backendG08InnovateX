@@ -3,7 +3,7 @@ import { FirebaseService } from '../../shared/firebase/firebase.service.js';
 
 @Injectable()
 export class PharmacistPatientsService {
-  private readonly collectionName = 'pharmacistPatients';
+  private readonly collectionName = 'users';
 
   constructor(private readonly firebaseService: FirebaseService) {}
 
