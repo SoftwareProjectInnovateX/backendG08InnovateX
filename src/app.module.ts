@@ -25,6 +25,7 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
 
 // Pharmacist
 import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.module.js';
+import { PharmacistModule } from './pharmacist/pharmacist.module.js';
 
 import { CartModule } from './customer/cart/cart.module.js';
 import { CustomerOrdersModule } from './customer/orders/orders.module.js';
@@ -59,6 +60,7 @@ import { CustomerOrdersModule } from './customer/orders/orders.module.js';
 
     // Pharmacist
     PrescriptionsModule,
+    PharmacistModule,
 
     // Customer
     CartModule,
