@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param } from '@nestjs/common';
 import { CartService } from './cart.service';
 
 @Controller('cart')
@@ -9,7 +9,7 @@ export class CartController {
   // GET ALL CART ITEMS
   // ==============================
   @Get()
-  getAll() {
+  async getAll() {
     return this.cartService.getAll();
   }
 
@@ -17,23 +17,32 @@ export class CartController {
   // ADD ITEM TO CART
   // ==============================
   @Post()
-  addItem(@Body() body: any) {
+  async addItem(@Body() body: any) {
     return this.cartService.addItem(body);
   }
 
   // ==============================
-  // DELETE SINGLE ITEM
+  // UPDATE QTY
   // ==============================
-  @Delete(':id')
-  removeItem(@Param('id') id: string) {
-    return this.cartService.removeItem(Number(id));
+  @Patch(':id')
+  async updateQty(@Param('id') id: string, @Body() body: { qty: number }) {
+    return this.cartService.updateQty(id, body.qty);
   }
 
   // ==============================
   // CLEAR CART
+  // IMPORTANT: must be ABOVE @Delete(':id')
   // ==============================
   @Delete()
-  clearCart() {
+  async clearCart() {
     return this.cartService.clearCart();
+  }
+
+  // ==============================
+  // REMOVE SINGLE ITEM
+  // ==============================
+  @Delete(':id')
+  async removeItem(@Param('id') id: string) {
+    return this.cartService.removeItem(id);
   }
 }

@@ -1,29 +1,30 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  // ==============================
-  // PLACE ORDER
-  // ==============================
   @Post()
   async createOrder(@Body() body: any) {
     return this.ordersService.createOrder(body);
   }
 
-  // ==============================
-  // GET ALL ORDERS
-  // ==============================
   @Get()
   async getOrders() {
     return this.ordersService.getOrders();
   }
 
-  // ==============================
-  // PAYHERE NOTIFY
-  // ==============================
+  @Get('delivered')
+  async getDeliveredOrders() {
+    return this.ordersService.getDeliveredOrders();
+  }
+
+  @Get('product-code/:name')
+  async getProductCode(@Param('name') name: string) {
+    return this.ordersService.getProductCodeByName(name);
+  }
+
   @Post('notify')
   async notify(@Body() body: any) {
     return this.ordersService.handleNotify(body);
