@@ -6,14 +6,20 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { AdminProductApprovalService } from './admin-product-approval.service.js';
+import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
+import { RolesGuard } from '../../auth/roles.guard.js';
+import { Roles } from '../../auth/roles.decorator.js';
 
 class RejectDto {
   reason?: string;
 }
 
 @Controller('admin/pending-products')
+@UseGuards(FirebaseAuthGuard, RolesGuard)
+@Roles('admin')
 export class AdminProductApprovalController {
   constructor(private readonly approvalService: AdminProductApprovalService) {}
 

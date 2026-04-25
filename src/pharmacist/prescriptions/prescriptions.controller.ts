@@ -7,7 +7,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { PrescriptionsService } from './prescriptions.service';
 
-@Controller('api/prescriptions')
+@Controller('prescriptions')
 export class PrescriptionsController {
   constructor(private readonly prescriptionsService: PrescriptionsService) {}
 

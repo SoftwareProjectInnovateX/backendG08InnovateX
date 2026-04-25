@@ -156,6 +156,7 @@ export class AccountRequestsService {
     return {
       success: true,
       message: `Account approved. Email sent to ${request.email}.`,
+      tempPassword,
     };
   }
 
