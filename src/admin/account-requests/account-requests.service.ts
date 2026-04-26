@@ -30,6 +30,25 @@ function generateTempPassword(): string {
     .join('');
 }
 
+interface AccountRequest {
+  status: string;
+  email: string;
+  companyName?: string;
+  fullName?: string;
+  type: 'supplier' | 'pharmacist';
+  phone?: string;
+  contactPerson?: string;
+  businessRegNo?: string;
+  businessAddress?: string;
+  categories?: string[];
+  bankName?: string;
+  accountNumber?: string;
+  accountHolderName?: string;
+  nicNumber?: string;
+  licenseNumber?: string;
+  licenseExpiry?: string;
+  specialization?: string;
+}
 @Injectable()
 export class AccountRequestsService {
   constructor(
@@ -54,7 +73,7 @@ export class AccountRequestsService {
     const reqSnap = await reqRef.get();
     if (!reqSnap.exists) throw new NotFoundException('Request not found');
 
-    const request = reqSnap.data() as any;
+    const request = reqSnap.data() as AccountRequest;
     if (request.status !== 'pending') {
       throw new BadRequestException('Request has already been processed');
     }
@@ -68,14 +87,16 @@ export class AccountRequestsService {
         displayName: request.companyName || request.fullName,
       });
     } catch (authError: any) {
-      if (authError.code === 'auth/email-already-exists') {
+      if (
+        (authError as { code: string }).code === 'auth/email-already-exists'
+      ) {
         throw new BadRequestException(
           `An account with email ${request.email} already exists.`,
         );
       }
       throw authError;
     }
-    const uid = userRecord.uid;
+    const uid = (userRecord as { uid: string }).uid;
 
     if (request.type === 'supplier') {
       const supplierId = await this.generateNextId('suppliers', 'S');
@@ -127,7 +148,7 @@ export class AccountRequestsService {
 
     await this.mailService.sendApprovalEmail({
       to: request.email,
-      name: request.companyName || request.fullName,
+      name: request.companyName ?? request.fullName ?? '',
       role: request.type,
       tempPassword,
     });
@@ -144,7 +165,7 @@ export class AccountRequestsService {
     const reqSnap = await reqRef.get();
     if (!reqSnap.exists) throw new NotFoundException('Request not found');
 
-    const request = reqSnap.data() as any;
+    const request = reqSnap.data() as AccountRequest;
     if (request.status !== 'pending') {
       throw new BadRequestException('Request has already been processed');
     }
@@ -158,7 +179,7 @@ export class AccountRequestsService {
     // 2. Send rejection email
     await this.mailService.sendRejectionEmail({
       to: request.email,
-      name: request.companyName || request.fullName,
+      name: request.companyName ?? request.fullName ?? '',
       role: request.type,
     });
 
@@ -178,7 +199,7 @@ export class AccountRequestsService {
     let maxNum = 0;
 
     snapshot.forEach((d) => {
-      const val = d.data()[idField];
+      const val = d.data()[idField] as string | undefined;
       if (val) {
         const num = parseInt(String(val).replace(prefix, ''), 10);
         if (num > maxNum) maxNum = num;

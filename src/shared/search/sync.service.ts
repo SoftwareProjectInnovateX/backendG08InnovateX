@@ -11,7 +11,7 @@ export class SyncService {
 
   async syncAllProducts(): Promise<unknown> {
     const db = this.firebaseService.getDb(); // ← changed from getFirestore()
-    const snapshot = await db.collection('adminProducts').get();
+    const snapshot = await db.collection('pharmacistProducts').get();
     console.log(`\n🔄 Starting sync of ${snapshot.size} products...\n`);
 
     let success = 0;
@@ -28,14 +28,12 @@ export class SyncService {
         });
         success++;
         console.log(
-          `  ✅ (${success}/${snapshot.size}) ${String(product['productName'] ?? '')}`,
+          `  ✅ (${success}/${snapshot.size}) ${String(product['name'] ?? '')}`,
         );
       } catch (err: unknown) {
         failed++;
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(
-          `  ❌ Failed: ${String(product['productName'] ?? '')} — ${msg}`,
-        );
+        console.error(`  ❌ Failed: ${String(product['name'] ?? '')} — ${msg}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 200));
     }

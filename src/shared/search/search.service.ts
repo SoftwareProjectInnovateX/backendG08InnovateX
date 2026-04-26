@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-require-imports */
 
 import { Injectable, OnModuleInit } from '@nestjs/common';
@@ -12,11 +11,13 @@ const { pipeline } = require('@xenova/transformers');
 
 interface Product {
   id: string;
-  productName?: string;
+  name?: string;
   description?: string;
   category?: string;
   manufacturer?: string;
   availability?: string;
+  price?: number;
+  imageUrl?: string;
   similarityScore: number;
   searchSource: string;
   [key: string]: unknown;
@@ -32,7 +33,6 @@ interface SearchLog {
 export class SearchService implements OnModuleInit {
   private pinecone!: Pinecone;
   private index!: Index<RecordMetadata>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private embedder: any = null;
 
   constructor(private firebaseService: FirebaseService) {}
@@ -77,12 +77,15 @@ export class SearchService implements OnModuleInit {
 
       if (!pineconeResults.matches?.length) return [];
 
-      const db = this.firebaseService.getDb(); // ← changed from getFirestore()
+      const db = this.firebaseService.getDb();
       const results: Product[] = [];
 
       for (const match of pineconeResults.matches) {
         if (match.score === undefined || match.score < 0.3) continue;
-        const doc = await db.collection('adminProducts').doc(match.id).get();
+        const doc = await db
+          .collection('pharmacistProducts')
+          .doc(match.id)
+          .get();
         if (doc.exists) {
           results.push({
             ...(doc.data() as Product),
@@ -104,7 +107,7 @@ export class SearchService implements OnModuleInit {
     try {
       const db = this.firebaseService.getDb(); // ← changed from getFirestore()
       const queryLower = query.toLowerCase();
-      const snapshot = await db.collection('adminProducts').get();
+      const snapshot = await db.collection('pharmacistProducts').get();
 
       return snapshot.docs
         .map((doc) => ({
@@ -114,7 +117,7 @@ export class SearchService implements OnModuleInit {
         .filter((product) => {
           const p = product as Product;
           return (
-            p.productName?.toLowerCase().includes(queryLower) ||
+            p.name?.toLowerCase().includes(queryLower) ||
             p.description?.toLowerCase().includes(queryLower) ||
             p.category?.toLowerCase().includes(queryLower) ||
             p.manufacturer?.toLowerCase().includes(queryLower) ||
@@ -223,7 +226,7 @@ export class SearchService implements OnModuleInit {
     product: Product,
   ): Promise<void> {
     const textToEmbed = [
-      product.productName ?? '',
+      product.name ?? '',
       product.description ?? '',
       product.category ?? '',
       product.manufacturer ?? '',
@@ -239,7 +242,7 @@ export class SearchService implements OnModuleInit {
           id: productId,
           values: vector,
           metadata: {
-            productName: product.productName ?? '',
+            productName: product.name ?? '',
             category: product.category ?? '',
           },
         },

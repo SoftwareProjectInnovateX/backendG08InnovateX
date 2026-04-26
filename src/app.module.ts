@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 
@@ -14,15 +16,25 @@ import { OrdersModule } from './admin/orders/orders.module.js';
 import { NotificationsModule } from './admin/notifications/notifications.module.js';
 import { AdminSearchModule } from './admin/search/search.module.js';
 import { AccountRequestsModule } from './admin/account-requests/account-requests.module.js';
+import { ChatModule } from './admin/chat/chat.module.js';
 import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module';
 
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
 import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders.module.js';
 
+// Pharmacist
+import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.module.js';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+
+    // Serve uploaded prescription images statically
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'),
+      serveRoot: '/uploads',
+    }),
 
     // Shared
     FirebaseModule,
@@ -35,11 +47,15 @@ import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders
     NotificationsModule,
     AdminSearchModule,
     AccountRequestsModule,
+    ChatModule,
     AdminProductApprovalModule,
 
     // Supplier
     SupplierProductsModule,
     PurchaseOrdersModule,
+
+    // Pharmacist
+    PrescriptionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
