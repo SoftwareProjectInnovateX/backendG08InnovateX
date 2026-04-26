@@ -9,12 +9,18 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { SupplierProductsService } from './supplier-products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
+import { RolesGuard } from '../../auth/roles.guard.js';
+import { Roles } from '../../auth/roles.decorator.js';
 
 @Controller('supplier/products')
+@UseGuards(FirebaseAuthGuard, RolesGuard)
+@Roles('supplier')
 export class SupplierProductsController {
   constructor(private readonly productsService: SupplierProductsService) {}
 

@@ -1,7 +1,12 @@
-import { Controller, Get, Post, Param, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Param, HttpCode, UseGuards } from '@nestjs/common';
 import { AccountRequestsService } from './account-requests.service.js';
+import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
+import { RolesGuard } from '../../auth/roles.guard.js';
+import { Roles } from '../../auth/roles.decorator.js';
 
-@Controller('api/account-requests')
+@Controller('account-requests')
+@UseGuards(FirebaseAuthGuard, RolesGuard)
+@Roles('admin')
 export class AccountRequestsController {
   constructor(private readonly service: AccountRequestsService) {}
 
