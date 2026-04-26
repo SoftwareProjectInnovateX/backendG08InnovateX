@@ -7,11 +7,25 @@ export class UsersService {
 
   async getAllUsers() {
     const db = this.firebaseService.getDb();
-    const snapshot = await db
-      .collection('users')
-      .orderBy('createdAt', 'desc')
-      .get();
-    return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    try {
+      const snapshot = await db
+        .collection('users')
+        .where('role', '==', 'customer')
+        .orderBy('createdAt', 'desc')
+        .get();
+      return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    } catch (err) {
+      console.warn('orderBy/where failed, falling back to full fetch:', err.message);
+      const snapshot = await db.collection('users').get();
+      const allDocs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+      return allDocs
+        .filter((u) => !u.role || u.role === 'customer')
+        .sort((a, b) => {
+          const aTime = a.createdAt?._seconds ?? a.createdAt?.seconds ?? 0;
+          const bTime = b.createdAt?._seconds ?? b.createdAt?.seconds ?? 0;
+          return bTime - aTime;
+        });
+    }
   }
 
   async getUserById(id: string) {

@@ -5,6 +5,7 @@ import {
   Param,
   Body,
   HttpCode,
+    Post, 
   HttpStatus,
   UseGuards,
 } from '@nestjs/common';
@@ -42,4 +43,7 @@ export class AdminProductApprovalController {
   reject(@Param('id') id: string, @Body() body: RejectDto) {
     return this.approvalService.rejectProduct(id, body.reason);
   }
+
+  
 }
+

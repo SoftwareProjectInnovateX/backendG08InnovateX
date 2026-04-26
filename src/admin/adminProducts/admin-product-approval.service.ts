@@ -175,4 +175,6 @@ export class AdminProductApprovalService {
 
     return { success: true };
   }
+  // ── TEMPORARY TEST METHOD — remove after testing ──
+
 }
