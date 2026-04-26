@@ -10,7 +10,7 @@ export class ProductsController {
   async getProducts(@Query('category') category?: string) {
     return this.productsService.getProducts(category);
   }
-
+   //reduce stock by 1 when added to cart
   @Put(':productCode/decrement-stock')
   async decrementStock(
     @Param('productCode') productCode: string,
@@ -24,6 +24,7 @@ export class ProductsController {
     if (!productCode?.trim()) {
       throw new BadRequestException('Product code is required');
     }
+    //pass to service
     return this.productsService.decrementStock(productCode, body.quantity);
   }
 }
