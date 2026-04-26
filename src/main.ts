@@ -20,7 +20,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   await app.listen(5000);
-  console.log('Backend running on http://localhost:5000');
+  console.log('Backend running on http://localhost:5000'); // Restarted for route updates
 }
 
 bootstrap();

@@ -12,8 +12,15 @@ export class PharmacistReturnsService {
   async getReturnRequests() {
     const db = this.firebaseService.getDb();
     const snapshot = await db.collection(this.collectionName).get();
-    const data = snapshot.docs.map(doc => ({ firebaseId: doc.id, id: doc.id, ...doc.data() }));
-    data.sort((a: any, b: any) => (b.createdAt?._seconds ?? 0) - (a.createdAt?._seconds ?? 0));
+    const data = snapshot.docs.map((doc) => ({
+      firebaseId: doc.id,
+      id: doc.id,
+      ...doc.data(),
+    }));
+    data.sort(
+      (a: any, b: any) =>
+        (b.createdAt?._seconds ?? 0) - (a.createdAt?._seconds ?? 0),
+    );
     return data;
   }
 
@@ -36,10 +43,10 @@ export class PharmacistReturnsService {
 
     // Step 1: Update return document
     await db.collection(this.collectionName).doc(id).update({
-      returnStatus:   'approved',
-      refundStatus:   'processed',
+      returnStatus: 'approved',
+      refundStatus: 'processed',
       adjustmentNote: adjNote,
-      processedAt:    FieldValue.serverTimestamp(),
+      processedAt: FieldValue.serverTimestamp(),
     });
 
     // Step 2: Restock each item using productCode
@@ -50,7 +57,11 @@ export class PharmacistReturnsService {
         const code = item.productCode;
 
         if (!code) {
-          restockResults.push({ name: item.name, status: 'skipped', reason: 'missing productCode' });
+          restockResults.push({
+            name: item.name,
+            status: 'skipped',
+            reason: 'missing productCode',
+          });
           return;
         }
 
@@ -60,7 +71,7 @@ export class PharmacistReturnsService {
           .get();
 
         if (!snap.empty) {
-          const productRef  = snap.docs[0].ref;
+          const productRef = snap.docs[0].ref;
           const beforeStock = snap.docs[0].data().stock ?? 0;
           await productRef.update({
             stock: FieldValue.increment(item.quantity || 1),
@@ -70,25 +81,34 @@ export class PharmacistReturnsService {
             code,
             status: 'restocked',
             before: beforeStock,
-            after:  beforeStock + (item.quantity || 1),
+            after: beforeStock + (item.quantity || 1),
           });
         } else {
-          restockResults.push({ name: item.name, code, status: 'product_not_found' });
+          restockResults.push({
+            name: item.name,
+            code,
+            status: 'product_not_found',
+          });
         }
-      })
+      }),
     );
 
-    return { id, returnStatus: 'approved', refundStatus: 'processed', restockResults };
+    return {
+      id,
+      returnStatus: 'approved',
+      refundStatus: 'processed',
+      restockResults,
+    };
   }
 
   // Reject: update return doc only, no restock
   async rejectReturn(id: string, adjNote: string) {
     const db = this.firebaseService.getDb();
     await db.collection(this.collectionName).doc(id).update({
-      returnStatus:   'rejected',
-      refundStatus:   'rejected',
+      returnStatus: 'rejected',
+      refundStatus: 'rejected',
       adjustmentNote: adjNote,
-      processedAt:    FieldValue.serverTimestamp(),
+      processedAt: FieldValue.serverTimestamp(),
     });
     return { id, returnStatus: 'rejected', refundStatus: 'rejected' };
   }

@@ -16,7 +16,10 @@ export class PharmacistDispensedController {
   }
 
   @Put(':id')
-  async updateDispensedRecord(@Param('id') id: string, @Body() updateData: any) {
+  async updateDispensedRecord(
+    @Param('id') id: string,
+    @Body() updateData: any,
+  ) {
     return this.dispensedService.updateDispensedRecord(id, updateData);
   }
 }

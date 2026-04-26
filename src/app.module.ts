@@ -17,7 +17,7 @@ import { NotificationsModule } from './admin/notifications/notifications.module.
 import { AdminSearchModule } from './admin/search/search.module.js';
 import { AccountRequestsModule } from './admin/account-requests/account-requests.module.js';
 import { ChatModule } from './admin/chat/chat.module.js';
-import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module';
+import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module.js';
 
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
@@ -29,6 +29,7 @@ import { PharmacistModule } from './pharmacist/pharmacist.module.js';
 
 import { CartModule } from './customer/cart/cart.module.js';
 import { CustomerOrdersModule } from './customer/orders/orders.module.js';
+import { CustomerPrescriptionsModule } from './customer/prescriptions/customer-prescriptions.module.js';
 
 @Module({
   imports: [
@@ -64,7 +65,8 @@ import { CustomerOrdersModule } from './customer/orders/orders.module.js';
 
     // Customer
     CartModule,
-    CustomerOrdersModule
+    CustomerOrdersModule,
+    CustomerPrescriptionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

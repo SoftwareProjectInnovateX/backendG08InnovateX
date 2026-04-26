@@ -11,7 +11,11 @@ export class PharmacistOrdersService {
   async getOnlineOrders() {
     const db = this.firebaseService.getDb();
     const snapshot = await db.collection(this.collectionName).get();
-    return snapshot.docs.map(doc => ({ firebaseId: doc.id, id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => ({
+      firebaseId: doc.id,
+      id: doc.id,
+      ...doc.data(),
+    }));
   }
 
   async addOnlineOrder(orderData: any) {
@@ -30,7 +34,7 @@ export class PharmacistOrdersService {
   async getReturns() {
     const db = this.firebaseService.getDb();
     const snapshot = await db.collection(this.returnsCollection).get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
   async updateReturnStatus(id: string, updateData: any) {

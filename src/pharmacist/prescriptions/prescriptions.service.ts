@@ -4,7 +4,6 @@ import * as admin from 'firebase-admin';
 
 @Injectable()
 export class PrescriptionsService {
-
   private transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -55,7 +54,10 @@ export class PrescriptionsService {
         `,
       });
     } catch (emailErr) {
-      console.warn('Failed to send pharmacist email notification:', emailErr.message);
+      console.warn(
+        'Failed to send pharmacist email notification:',
+        emailErr.message,
+      );
     }
 
     return {

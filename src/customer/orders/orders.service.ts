@@ -10,24 +10,22 @@ export class OrdersService {
     const db = this.firebaseService.getDb();
 
     const orderPayload = {
-      orderId:       body.orderId,
-      customerName:  `${body.firstName} ${body.lastName}`,
-      email:         body.email,
-      phone:         body.phone,
-      address:       `${body.houseNumber}, ${body.laneStreet}, ${body.city}`,
-      country:       body.country || 'Sri Lanka',
-      orderNotes:    body.orderNotes || '',
+      orderId: body.orderId,
+      customerName: `${body.firstName} ${body.lastName}`,
+      email: body.email,
+      phone: body.phone,
+      address: `${body.houseNumber}, ${body.laneStreet}, ${body.city}`,
+      country: body.country || 'Sri Lanka',
+      orderNotes: body.orderNotes || '',
       paymentMethod: body.paymentMethod,
       paymentStatus: body.paymentMethod === 'ONLINE' ? 'paid' : 'pending',
-      orderStatus:   body.orderStatus || 'pending',
-      totalAmount:   body.totalAmount,
-      types:         body.items || [],
-      createdAt:     FieldValue.serverTimestamp(),
+      orderStatus: body.orderStatus || 'pending',
+      totalAmount: body.totalAmount,
+      types: body.items || [],
+      createdAt: FieldValue.serverTimestamp(),
     };
 
-    const docRef = await db
-      .collection('CustomerOrders')
-      .add(orderPayload);
+    const docRef = await db.collection('CustomerOrders').add(orderPayload);
 
     return { success: true, id: docRef.id };
   }
@@ -35,7 +33,7 @@ export class OrdersService {
   async getOrders() {
     const db = this.firebaseService.getDb();
     const snap = await db.collection('CustomerOrders').get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 
   async handleNotify(body: any) {

@@ -4,7 +4,6 @@ import * as puppeteer from 'puppeteer';
 
 @Injectable()
 export class InvoicesService {
-
   // POST /supplier/invoices/generate-pdf
   // Replaces generatePDF() in InvoicePayments.jsx
   // Returns a proper PDF buffer instead of opening a raw browser window

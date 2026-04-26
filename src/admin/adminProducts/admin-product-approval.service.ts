@@ -27,9 +27,13 @@ export class AdminProductApprovalService {
       return {
         id: d.id,
         ...data,
-        createdAt:  data.createdAt  ? { _seconds: data.createdAt.seconds }  : null,
-        approvedAt: data.approvedAt ? { _seconds: data.approvedAt.seconds } : null,
-        rejectedAt: data.rejectedAt ? { _seconds: data.rejectedAt.seconds } : null,
+        createdAt: data.createdAt ? { _seconds: data.createdAt.seconds } : null,
+        approvedAt: data.approvedAt
+          ? { _seconds: data.approvedAt.seconds }
+          : null,
+        rejectedAt: data.rejectedAt
+          ? { _seconds: data.rejectedAt.seconds }
+          : null,
       };
     });
   }
@@ -38,33 +42,33 @@ export class AdminProductApprovalService {
   async approveProduct(pendingProductId: string) {
     const db = this.firebaseService.getDb();
 
-    const pendingRef  = db.collection('pendingProducts').doc(pendingProductId);
+    const pendingRef = db.collection('pendingProducts').doc(pendingProductId);
     const pendingSnap = await pendingRef.get();
 
     if (!pendingSnap.exists) {
       throw new NotFoundException('Pending product not found');
     }
 
-    const data        = pendingSnap.data()!;
+    const data = pendingSnap.data()!;
     const productCode = await this.countersService.generateProductCode();
 
-    const suppliedStock  = data.stock    ?? 0;
+    const suppliedStock = data.stock ?? 0;
     const remainingStock = data.minStock ?? 0;
 
     const productPayload = {
-      productName:    data.productName,
+      productName: data.productName,
       productCode,
-      category:       data.category,
+      category: data.category,
       wholesalePrice: data.wholesalePrice,
-      stock:          suppliedStock,
-      minStock:       remainingStock,
-      description:    data.description  || '',
-      manufacturer:   data.manufacturer || '',
-      availability:   suppliedStock > 0 ? 'in stock' : 'out of stock',
-      supplierId:     data.supplierId,
-      supplierName:   data.supplierName,
-      createdAt:      Timestamp.now(),
-      updatedAt:      Timestamp.now(),
+      stock: suppliedStock,
+      minStock: remainingStock,
+      description: data.description || '',
+      manufacturer: data.manufacturer || '',
+      availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
+      supplierId: data.supplierId,
+      supplierName: data.supplierName,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
     };
 
     // Add to live products collection
@@ -72,56 +76,73 @@ export class AdminProductApprovalService {
 
     // Add to adminProducts collection
     await db.collection('adminProducts').add({
-      productId:      productRef.id,
-      supplierId:     data.supplierId,
-      supplierName:   data.supplierName,
-      productName:    data.productName,
+      productId: productRef.id,
+      supplierId: data.supplierId,
+      supplierName: data.supplierName,
+      productName: data.productName,
       productCode,
-      category:       data.category,
+      category: data.category,
       wholesalePrice: data.wholesalePrice,
-      retailPrice:    (data.wholesalePrice ?? 0) * 1.2,
-      stock:          suppliedStock,
-      minStock:       remainingStock,
-      description:    data.description  || '',
-      manufacturer:   data.manufacturer || '',
-      availability:   suppliedStock > 0 ? 'in stock' : 'out of stock',
-      lastRestocked:  Timestamp.now(),
-      createdAt:      Timestamp.now(),
-      updatedAt:      Timestamp.now(),
+      retailPrice: (data.wholesalePrice ?? 0) * 1.2,
+      stock: suppliedStock,
+      minStock: remainingStock,
+      description: data.description || '',
+      manufacturer: data.manufacturer || '',
+      availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
+      lastRestocked: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
     });
 
     // Update pendingProducts doc — supplier's onSnapshot fires here automatically
     await pendingRef.update({
-      status:     'approved',
+      status: 'approved',
       approvedAt: Timestamp.now(),
       productCode,
-      productId:  productRef.id,
+      productId: productRef.id,
     });
 
     // Notify supplier
     await db.collection('notifications').add({
-      type:             'PRODUCT_APPROVED',
-      recipientId:      data.supplierId,
-      recipientType:    'supplier',
-      supplierId:       data.supplierId,
+      type: 'PRODUCT_APPROVED',
+      recipientId: data.supplierId,
+      recipientType: 'supplier',
+      supplierId: data.supplierId,
       pendingProductId,
-      productName:      data.productName,
+      productName: data.productName,
       productCode,
       message: `Your product "${data.productName}" (${productCode}) has been approved and added to the inventory.`,
-      read:      false,
+      read: false,
+      createdAt: Timestamp.now(),
+    });
+
+    // Notify Pharmacist
+    console.log(
+      `[AdminProductService] Notifying pharmacist about approved product: ${data.productName}`,
+    );
+    await db.collection('pharmacistNotifications').add({
+      type: 'inventory_new',
+      category: 'New Item',
+      title: 'New Product Added',
+      subtitle: `Category: ${data.category}`,
+      message: `${data.productName} has been approved and added to inventory.`,
+      icon: 'PackagePlus',
+      colorType: 'emerald',
       createdAt: Timestamp.now(),
     });
 
     // ✅ Fixed: use data.supplierEmail for the `to` field
     if (data.supplierEmail) {
       await this.mailService.sendProductApprovedEmail({
-        to:           data.supplierEmail,
+        to: data.supplierEmail,
         supplierName: data.supplierName,
-        productName:  data.productName,
+        productName: data.productName,
         productCode,
       });
     } else {
-      console.warn(`[ApproveProduct] No supplierEmail found for supplierId: ${data.supplierId}. Email not sent.`);
+      console.warn(
+        `[ApproveProduct] No supplierEmail found for supplierId: ${data.supplierId}. Email not sent.`,
+      );
     }
 
     return { success: true, productId: productRef.id, productCode };
@@ -131,7 +152,7 @@ export class AdminProductApprovalService {
   async rejectProduct(pendingProductId: string, reason?: string) {
     const db = this.firebaseService.getDb();
 
-    const pendingRef  = db.collection('pendingProducts').doc(pendingProductId);
+    const pendingRef = db.collection('pendingProducts').doc(pendingProductId);
     const pendingSnap = await pendingRef.get();
 
     if (!pendingSnap.exists) {
@@ -142,37 +163,155 @@ export class AdminProductApprovalService {
 
     // Update pendingProducts doc — supplier's onSnapshot fires here automatically
     await pendingRef.update({
-      status:          'rejected',
-      rejectedAt:      Timestamp.now(),
+      status: 'rejected',
+      rejectedAt: Timestamp.now(),
       rejectionReason: reason || '',
     });
 
     // Notify supplier
     await db.collection('notifications').add({
-      type:             'PRODUCT_REJECTED',
-      recipientId:      data.supplierId,
-      recipientType:    'supplier',
-      supplierId:       data.supplierId,
+      type: 'PRODUCT_REJECTED',
+      recipientId: data.supplierId,
+      recipientType: 'supplier',
+      supplierId: data.supplierId,
       pendingProductId,
-      productName:      data.productName,
-      rejectionReason:  reason || '',
+      productName: data.productName,
+      rejectionReason: reason || '',
       message: `Your product "${data.productName}" was not approved.${reason ? ' Reason: ' + reason : ''}`,
-      read:      false,
+      read: false,
       createdAt: Timestamp.now(),
     });
 
     // ✅ Fixed: use data.supplierEmail for the `to` field
     if (data.supplierEmail) {
       await this.mailService.sendProductRejectedEmail({
-        to:           data.supplierEmail,
+        to: data.supplierEmail,
         supplierName: data.supplierName,
-        productName:  data.productName,
+        productName: data.productName,
         reason,
       });
     } else {
-      console.warn(`[RejectProduct] No supplierEmail found for supplierId: ${data.supplierId}. Email not sent.`);
+      console.warn(
+        `[RejectProduct] No supplierEmail found for supplierId: ${data.supplierId}. Email not sent.`,
+      );
     }
 
     return { success: true };
+  }
+
+  // ── POST /admin/pending-products/manual
+  async createManualProduct(dto: any) {
+    const db = this.firebaseService.getDb();
+    const productCode = await this.countersService.generateProductCode();
+
+    const suppliedStock = Number(dto.stock) || 0;
+
+    const productPayload = {
+      productName: dto.productName,
+      productCode,
+      category: dto.category,
+      wholesalePrice: Number(dto.wholesalePrice),
+      stock: suppliedStock,
+      minStock: Number(dto.minStock) || 0,
+      description: dto.description || '',
+      manufacturer: dto.manufacturer || '',
+      availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
+      supplierId: 'admin_manual',
+      supplierName: 'MediCareX Admin',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    };
+
+    // Add to live products collection
+    const productRef = await db.collection('products').add(productPayload);
+
+    // Add to adminProducts collection
+    await db.collection('adminProducts').add({
+      productId: productRef.id,
+      supplierId: 'admin_manual',
+      supplierName: 'MediCareX Admin',
+      productName: dto.productName,
+      productCode,
+      category: dto.category,
+      wholesalePrice: Number(dto.wholesalePrice),
+      retailPrice: Number(dto.retailPrice) || Number(dto.wholesalePrice) * 1.2,
+      stock: suppliedStock,
+      minStock: Number(dto.minStock) || 0,
+      description: dto.description || '',
+      manufacturer: dto.manufacturer || '',
+      availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
+      lastRestocked: Timestamp.now(),
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+
+    // Notify Pharmacist
+    console.log(
+      `[AdminProductService] Notifying pharmacist about manual addition: ${dto.productName}`,
+    );
+    await db.collection('pharmacistNotifications').add({
+      type: 'inventory_new',
+      category: 'Manual Entry',
+      title: 'Direct Inventory Addition',
+      subtitle: `Category: ${dto.category}`,
+      message: `${dto.productName} has been manually added to inventory by Admin.`,
+      icon: 'PackagePlus',
+      colorType: 'emerald',
+      createdAt: Timestamp.now(),
+    });
+
+    return { success: true, productId: productRef.id, productCode };
+  }
+
+  // ── DELETE /admin/pending-products/remove/:id
+  async deleteProduct(id: string) {
+    const db = this.firebaseService.getDb();
+
+    // 1. Check in pendingProducts
+    const pendingRef = db.collection('pendingProducts').doc(id);
+    const pendingSnap = await pendingRef.get();
+
+    if (pendingSnap.exists) {
+      await pendingRef.delete();
+      console.log(`[AdminProductService] Deleted pending product: ${id}`);
+      return { success: true, message: 'Pending product deleted' };
+    }
+
+    // 2. If not found, check in adminProducts (inventory)
+    const adminRef = db.collection('adminProducts').doc(id);
+    const adminSnap = await adminRef.get();
+
+    if (adminSnap.exists) {
+      const data = adminSnap.data()!;
+      const productId = data.productId;
+
+      // Delete from adminProducts
+      await adminRef.delete();
+
+      // Notify Pharmacist about removal
+      console.log(`[AdminProductService] Notifying pharmacist about removal of: ${data.productName}`);
+      await db.collection('pharmacistNotifications').add({
+        type: 'inventory_removed',
+        category: 'Removal',
+        title: 'Product Removed',
+        subtitle: `Category: ${data.category || 'General'}`,
+        message: `${data.productName} has been removed from the inventory by Admin.`,
+        icon: 'PackageMinus',
+        colorType: 'red',
+        createdAt: this.firebaseService.getTimestamp(),
+      });
+
+      // Also delete from products collection if productId exists
+      if (productId) {
+        await db.collection('products').doc(productId).delete();
+      }
+
+      console.log(
+        `[AdminProductService] Deleted inventory product: ${id} (associated productId: ${productId})`,
+      );
+      return { success: true, message: 'Inventory product deleted' };
+    }
+
+    throw new NotFoundException('Product not found in pending or inventory list');
   }
 }

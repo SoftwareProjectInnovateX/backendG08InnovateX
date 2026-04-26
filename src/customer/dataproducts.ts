@@ -64,8 +64,7 @@ export const ALL_PRODUCTS: Product[] = [
     rating: 4.8,
     reviews: 124,
     details: {
-      ingredients:
-        'Aloe Vera, Glycerin, Vitamin E, Zinc Oxide',
+      ingredients: 'Aloe Vera, Glycerin, Vitamin E, Zinc Oxide',
       usage:
         'Apply generously 15 minutes before sun exposure. Reapply every 2 hours.',
       benefits: [
@@ -119,7 +118,5 @@ export const getProductById = (id: string): Product | undefined => {
 export const getProductsByCategory = (categoryId: string): Product[] => {
   if (categoryId === 'all') return ALL_PRODUCTS;
 
-  return ALL_PRODUCTS.filter(
-    (product) => product.category === categoryId
-  );
+  return ALL_PRODUCTS.filter((product) => product.category === categoryId);
 };

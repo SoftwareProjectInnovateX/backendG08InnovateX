@@ -1,6 +1,12 @@
 import {
-  Controller, Post, Get, Patch,
-  Param, Body, UploadedFile, UseInterceptors,
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Param,
+  Body,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -30,7 +36,10 @@ export class PrescriptionsController {
     @Body('customerAddress') customerAddress: string,
   ) {
     return this.prescriptionsService.uploadPrescription(
-      file, customerName, customerPhone, customerAddress,
+      file,
+      customerName,
+      customerPhone,
+      customerAddress,
     );
   }
 
@@ -40,10 +49,7 @@ export class PrescriptionsController {
   }
 
   @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() updateData: any,
-  ) {
+  async update(@Param('id') id: string, @Body() updateData: any) {
     return this.prescriptionsService.updatePrescription(id, updateData);
   }
 }

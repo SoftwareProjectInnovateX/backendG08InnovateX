@@ -57,17 +57,24 @@ export const ALL_PRODUCTS: Product[] = [
     price: 2100,
     stock: 45,
     category: 'skincare',
-    imageUrl: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80',
+    imageUrl:
+      'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&q=80',
     requiresPrescription: false,
     brand: 'Onelle Naturals',
     rating: 4.8,
     reviews: 124,
     details: {
       ingredients: 'Aloe Vera, Glycerin, Vitamin E, Zinc Oxide',
-      usage: 'Apply generously 15 minutes before sun exposure. Reapply every 2 hours.',
-      benefits: ['SPF 50 Protection', 'Water Resistant', 'Non-greasy', 'For all skin types'],
-      specifications: { Volume: '100ml', 'SPF Level': '50' }
-    }
+      usage:
+        'Apply generously 15 minutes before sun exposure. Reapply every 2 hours.',
+      benefits: [
+        'SPF 50 Protection',
+        'Water Resistant',
+        'Non-greasy',
+        'For all skin types',
+      ],
+      specifications: { Volume: '100ml', 'SPF Level': '50' },
+    },
   },
 
   {
@@ -77,15 +84,20 @@ export const ALL_PRODUCTS: Product[] = [
     price: 3500,
     stock: 32,
     category: 'skincare',
-    imageUrl: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80',
+    imageUrl:
+      'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&q=80',
     requiresPrescription: false,
     brand: 'GlowLab',
     rating: 4.6,
     reviews: 89,
     details: {
-      benefits: ['Brightens skin', 'Reduces wrinkles', 'Antioxidant protection'],
-      specifications: { Volume: '30ml' }
-    }
+      benefits: [
+        'Brightens skin',
+        'Reduces wrinkles',
+        'Antioxidant protection',
+      ],
+      specifications: { Volume: '30ml' },
+    },
   },
 
   {
@@ -95,15 +107,16 @@ export const ALL_PRODUCTS: Product[] = [
     price: 1850,
     stock: 58,
     category: 'skincare',
-    imageUrl: 'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?w=400&q=80',
+    imageUrl:
+      'https://images.unsplash.com/photo-1556229010-6c3f2c9ca5f8?w=400&q=80',
     requiresPrescription: false,
     brand: 'DermaCare',
     rating: 4.7,
     reviews: 156,
     details: {
       benefits: ['Deep hydration', 'Non-comedogenic', 'Fragrance-free'],
-      specifications: { Volume: '50ml' }
-    }
+      specifications: { Volume: '50ml' },
+    },
   },
 
   {
@@ -113,26 +126,27 @@ export const ALL_PRODUCTS: Product[] = [
     price: 4200,
     stock: 28,
     category: 'skincare',
-    imageUrl: 'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=400&q=80',
+    imageUrl:
+      'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=400&q=80',
     requiresPrescription: false,
     brand: 'AgeDefense',
     rating: 4.9,
     reviews: 203,
     details: {
       benefits: ['Retinol formula', 'Firms skin', 'Reduces wrinkles'],
-      specifications: { Volume: '50ml' }
-    }
-  }
+      specifications: { Volume: '50ml' },
+    },
+  },
 ];
 
 // ==============================
 // FUNCTIONS
 // ==============================
 export function getProductById(id: string): Product | undefined {
-  return ALL_PRODUCTS.find(product => product.id === id);
+  return ALL_PRODUCTS.find((product) => product.id === id);
 }
 
 export function getProductsByCategory(categoryId: string): Product[] {
   if (categoryId === 'all') return ALL_PRODUCTS;
-  return ALL_PRODUCTS.filter(product => product.category === categoryId);
+  return ALL_PRODUCTS.filter((product) => product.category === categoryId);
 }

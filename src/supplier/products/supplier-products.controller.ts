@@ -38,7 +38,7 @@ export class SupplierProductsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   createProduct(
-    @Query('supplierId')   supplierId:   string,
+    @Query('supplierId') supplierId: string,
     @Query('supplierName') supplierName: string,
     @Body() dto: CreateProductDto,
   ) {
@@ -48,10 +48,7 @@ export class SupplierProductsController {
   // PATCH /supplier/products/:id
   // Updates an already-approved product
   @Patch(':id')
-  updateProduct(
-    @Param('id') productId: string,
-    @Body() dto: UpdateProductDto,
-  ) {
+  updateProduct(@Param('id') productId: string, @Body() dto: UpdateProductDto) {
     return this.productsService.updateProduct(productId, dto);
   }
 
