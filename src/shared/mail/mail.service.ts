@@ -166,15 +166,15 @@ export class MailService {
   }
 
   async sendProductApprovedEmail(data: {
-  to: string;
-  supplierName: string;
-  productName: string;
-  productCode: string;
-}): Promise<void> {
-  await this.mailer.sendMail({
-    to: data.to,
-    subject: `Product Approved: ${data.productName}`,
-    html: `
+    to: string;
+    supplierName: string;
+    productName: string;
+    productCode: string;
+  }): Promise<void> {
+    await this.mailer.sendMail({
+      to: data.to,
+      subject: `Product Approved: ${data.productName}`,
+      html: `
       <!DOCTYPE html>
       <html>
       <head>
@@ -231,19 +231,19 @@ export class MailService {
       </body>
       </html>
     `,
-  });
-}
+    });
+  }
 
-async sendProductRejectedEmail(data: {
-  to: string;
-  supplierName: string;
-  productName: string;
-  reason?: string;
-}): Promise<void> {
-  await this.mailer.sendMail({
-    to: data.to,
-    subject: `Product Submission Update: ${data.productName}`,
-    html: `
+  async sendProductRejectedEmail(data: {
+    to: string;
+    supplierName: string;
+    productName: string;
+    reason?: string;
+  }): Promise<void> {
+    await this.mailer.sendMail({
+      to: data.to,
+      subject: `Product Submission Update: ${data.productName}`,
+      html: `
       <!DOCTYPE html>
       <html>
       <head>
@@ -283,10 +283,14 @@ async sendProductRejectedEmail(data: {
               Your submission for <strong>${data.productName}</strong> has been
               <strong style="color:#dc2626;">rejected</strong> by our admin team.
             </p>
-            ${data.reason ? `
+            ${
+              data.reason
+                ? `
             <div class="reason-box">
               <strong>Reason:</strong> ${data.reason}
-            </div>` : ''}
+            </div>`
+                : ''
+            }
             <p class="message">
               Please review the feedback, make the necessary corrections, and resubmit
               your product from your supplier dashboard.
@@ -299,6 +303,6 @@ async sendProductRejectedEmail(data: {
       </body>
       </html>
     `,
-  });
-}
+    });
+  }
 }

@@ -7,7 +7,7 @@ interface ChatRequest {
   history: { role: string; text: string }[];
 }
 
-@Controller('api/admin/chat')
+@Controller('admin/chat')
 @UseGuards(FirebaseAuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}

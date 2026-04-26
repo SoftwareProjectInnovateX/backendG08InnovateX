@@ -7,9 +7,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 
 @Injectable()
 export class SupplierProductsService {
-  constructor(
-    private readonly firebaseService: FirebaseService,
-  ) {}
+  constructor(private readonly firebaseService: FirebaseService) {}
 
   // ── GET /supplier/products?supplierId=xxx
   // Returns only APPROVED products (live in 'products' collection)
@@ -30,7 +28,8 @@ export class SupplierProductsService {
   async getPendingProducts(supplierId: string) {
     const db = this.firebaseService.getDb();
 
-    const snapshot = await db.collection('products')
+    const snapshot = await db
+      .collection('products')
       .where('supplierId', '==', supplierId)
       .where('status', '==', 'pending')
       .orderBy('createdAt', 'desc')
@@ -41,9 +40,13 @@ export class SupplierProductsService {
       return {
         id: d.id,
         ...data,
-        createdAt:  data.createdAt  ? { _seconds: data.createdAt.seconds }  : null,
-        approvedAt: data.approvedAt ? { _seconds: data.approvedAt.seconds } : null,
-        rejectedAt: data.rejectedAt ? { _seconds: data.rejectedAt.seconds } : null,
+        createdAt: data.createdAt ? { _seconds: data.createdAt.seconds } : null,
+        approvedAt: data.approvedAt
+          ? { _seconds: data.approvedAt.seconds }
+          : null,
+        rejectedAt: data.rejectedAt
+          ? { _seconds: data.rejectedAt.seconds }
+          : null,
       };
     });
   }
@@ -62,16 +65,16 @@ export class SupplierProductsService {
     const remainingStock = dto.minStock || 0;
 
     const pendingProduct = {
-      productName:    dto.productName,
-      category:       dto.category,
+      productName: dto.productName,
+      category: dto.category,
       wholesalePrice: dto.wholesalePrice,
-      stock:          suppliedStock,
-      minStock:       remainingStock,
-      description:    dto.description  || '',
-      manufacturer:   dto.manufacturer || '',
+      stock: suppliedStock,
+      minStock: remainingStock,
+      description: dto.description || '',
+      manufacturer: dto.manufacturer || '',
       supplierId,
       supplierName,
-      status:    'pending',
+      status: 'pending',
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
@@ -86,14 +89,14 @@ export class SupplierProductsService {
   async updateProduct(productId: string, dto: UpdateProductDto) {
     const db = this.firebaseService.getDb();
 
-    const productRef  = db.collection('products').doc(productId);
+    const productRef = db.collection('products').doc(productId);
     const productSnap = await productRef.get();
 
     if (!productSnap.exists) {
       throw new NotFoundException('Product not found');
     }
 
-    const suppliedStock  = dto.stock    ?? 0;
+    const suppliedStock = dto.stock ?? 0;
     const remainingStock = dto.minStock ?? 0;
 
     const updatedData = {
@@ -105,7 +108,7 @@ export class SupplierProductsService {
       description: dto.description ?? '',
       manufacturer: dto.manufacturer ?? '',
       availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
-      updatedAt:    Timestamp.now(),
+      updatedAt: Timestamp.now(),
     };
 
     await productRef.update(updatedData);

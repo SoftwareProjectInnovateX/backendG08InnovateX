@@ -4,7 +4,6 @@ import * as admin from 'firebase-admin';
 
 @Injectable()
 export class PrescriptionsService {
-
   private transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -34,25 +33,32 @@ export class PrescriptionsService {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    await this.transporter.sendMail({
-      from: `"MediCare Pharmacy" <${process.env.EMAIL_USER}>`,
-      to: process.env.PHARMACIST_EMAIL,
-      subject: '📋 New Prescription Uploaded',
-      html: `
-        <div style="font-family:Arial,sans-serif;padding:20px;">
-          <h2 style="color:#16a34a;">New Prescription Received</h2>
-          <p><b>Name:</b> ${customerName}</p>
-          <p><b>Phone:</b> ${customerPhone}</p>
-          <p><b>Address:</b> ${customerAddress}</p>
-          <p><b>Status:</b> Pending</p>
-          <a href="${imageUrl}"
-            style="background:#16a34a;color:white;padding:10px 20px;
-                   border-radius:6px;text-decoration:none;">
-            View Prescription
-          </a>
-        </div>
-      `,
-    });
+    try {
+      await this.transporter.sendMail({
+        from: `"MediCare Pharmacy" <${process.env.EMAIL_USER}>`,
+        to: process.env.PHARMACIST_EMAIL,
+        subject: '📋 New Prescription Uploaded',
+        html: `
+          <div style="font-family:Arial,sans-serif;padding:20px;">
+            <h2 style="color:#16a34a;">New Prescription Received</h2>
+            <p><b>Name:</b> ${customerName}</p>
+            <p><b>Phone:</b> ${customerPhone}</p>
+            <p><b>Address:</b> ${customerAddress}</p>
+            <p><b>Status:</b> Pending</p>
+            <a href="${imageUrl}"
+              style="background:#16a34a;color:white;padding:10px 20px;
+                     border-radius:6px;text-decoration:none;">
+              View Prescription
+            </a>
+          </div>
+        `,
+      });
+    } catch (emailErr) {
+      console.warn(
+        'Failed to send pharmacist email notification:',
+        emailErr.message,
+      );
+    }
 
     return {
       prescription: {
@@ -74,8 +80,8 @@ export class PrescriptionsService {
     return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
-  async updateStatus(id: string, status: string) {
-    await this.db.collection('prescriptions').doc(id).update({ status });
+  async updatePrescription(id: string, updateData: any) {
+    await this.db.collection('prescriptions').doc(id).update(updateData);
     return { success: true };
   }
 }

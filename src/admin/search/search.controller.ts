@@ -3,7 +3,7 @@ import { SearchService } from '../../shared/search/search.service.js';
 import { SyncService } from '../../shared/search/sync.service.js';
 import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
 
-@Controller('api/admin/search')
+@Controller('admin/search')
 @UseGuards(FirebaseAuthGuard)
 export class AdminSearchController {
   constructor(

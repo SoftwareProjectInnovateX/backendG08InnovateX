@@ -38,7 +38,7 @@ export class NotificationsService {
     return { success: true, message: 'Notification marked as read' };
   }
 
-  // ─── PATCH mark ALL notifications as read 
+  // ─── PATCH mark ALL notifications as read
   async markAllAsRead() {
     const snapshot = await this.db
       .collection('notifications')
@@ -56,7 +56,7 @@ export class NotificationsService {
     };
   }
 
-  // ─── PATCH mark order as received (ORDER_APPROVED action) 
+  // ─── PATCH mark order as received (ORDER_APPROVED action)
   async markOrderAsReceived(notificationId: string) {
     // 1. Get notification
     const notifRef = this.db.collection('notifications').doc(notificationId);
@@ -66,7 +66,7 @@ export class NotificationsService {
       throw new NotFoundException('Notification not found');
     }
 
-    const notification = notifSnap.data()!; 
+    const notification = notifSnap.data()!;
 
     // 2. Get purchase order
     const orderRef = this.db
@@ -78,7 +78,7 @@ export class NotificationsService {
       throw new NotFoundException('Order not found');
     }
 
-    const order = orderSnap.data()!; 
+    const order = orderSnap.data()!;
 
     // 3. Validate order status
     if (order.status !== 'APPROVED') {
@@ -101,7 +101,7 @@ export class NotificationsService {
     const adminProductSnap = await adminProductRef.get();
 
     if (adminProductSnap.exists) {
-      const adminProduct = adminProductSnap.data()!; 
+      const adminProduct = adminProductSnap.data()!;
       await adminProductRef.update({
         stock: (adminProduct.stock || 0) + order.quantity,
         availability: 'in stock',
@@ -119,7 +119,7 @@ export class NotificationsService {
     };
   }
 
-  // ─── DELETE notification 
+  // ─── DELETE notification
   async deleteNotification(notificationId: string) {
     const ref = this.db.collection('notifications').doc(notificationId);
     const snap = await ref.get();

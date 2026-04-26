@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { FirebaseService } from '../firebase/firebase.service';
+import { FirebaseService } from '../../shared/firebase/firebase.service';
 
 @Injectable()
 export class CountersService {

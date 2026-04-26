@@ -1,13 +1,19 @@
 import {
-  Controller, Post, Get, Patch,
-  Param, Body, UploadedFile, UseInterceptors,
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Param,
+  Body,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { PrescriptionsService } from './prescriptions.service';
 
-@Controller('api/prescriptions')
+@Controller('prescriptions')
 export class PrescriptionsController {
   constructor(private readonly prescriptionsService: PrescriptionsService) {}
 
@@ -30,7 +36,10 @@ export class PrescriptionsController {
     @Body('customerAddress') customerAddress: string,
   ) {
     return this.prescriptionsService.uploadPrescription(
-      file, customerName, customerPhone, customerAddress,
+      file,
+      customerName,
+      customerPhone,
+      customerAddress,
     );
   }
 
@@ -39,11 +48,8 @@ export class PrescriptionsController {
     return this.prescriptionsService.getAllPrescriptions();
   }
 
-  @Patch(':id/status')
-  async updateStatus(
-    @Param('id') id: string,
-    @Body('status') status: string,
-  ) {
-    return this.prescriptionsService.updateStatus(id, status);
+  @Patch(':id')
+  async update(@Param('id') id: string, @Body() updateData: any) {
+    return this.prescriptionsService.updatePrescription(id, updateData);
   }
 }

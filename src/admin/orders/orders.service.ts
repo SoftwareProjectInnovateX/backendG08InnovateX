@@ -29,18 +29,19 @@ export class OrdersService {
       const orderData = {
         ...orderPayload,
         date: currentTimestamp,
-        createdAt: currentTimestamp
+        createdAt: currentTimestamp,
       };
 
       const docRef = await db.collection('orders').add(orderData);
-      
-      return { 
-        id: docRef.id, 
-        ...orderData 
+
+      return {
+        id: docRef.id,
+        ...orderData,
       };
     } catch (error) {
-      
-      throw new InternalServerErrorException(`Order creation failed: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Order creation failed: ${error.message}`,
+      );
     }
   }
 }

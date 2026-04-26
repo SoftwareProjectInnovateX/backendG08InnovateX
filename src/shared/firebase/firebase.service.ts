@@ -1,17 +1,17 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getAuth, Auth } from 'firebase-admin/auth';
 
 @Injectable()
-export class FirebaseService implements OnModuleInit {
+export class FirebaseService {
   private db!: Firestore;
   private authAdmin!: Auth;
 
-  onModuleInit() {
+  private ensureInitialized() {
     if (!getApps().length) {
       initializeApp({
         credential: cert({
@@ -21,15 +21,23 @@ export class FirebaseService implements OnModuleInit {
         }),
       });
     }
-    this.db = getFirestore();
-    this.authAdmin = getAuth();
+    if (!this.db) this.db = getFirestore();
+    if (!this.authAdmin) this.authAdmin = getAuth();
   }
 
-  getDb() {
-    return getFirestore();
+  getDb(): Firestore {
+    this.ensureInitialized();
+    return this.db;
   }
 
   getAdmin(): Auth {
+    this.ensureInitialized();
     return this.authAdmin;
+  }
+
+  getTimestamp() {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const admin = require('firebase-admin');
+    return admin.firestore.FieldValue.serverTimestamp();
   }
 }
