@@ -4,7 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 @Injectable()
 export class PharmacistReturnsService {
-  private readonly collectionName = 'CustomerReturns'; // ✅ fixed casing
+  private readonly collectionName = 'CustomerReturns';
   private readonly productsCollection = 'products';
 
   constructor(private readonly firebaseService: FirebaseService) {}
@@ -54,6 +54,9 @@ export class PharmacistReturnsService {
           return;
         }
 
+        // ✅ FIX: force positive integer — prevents negative/string quantity from decrementing stock
+        const qty = Math.abs(parseInt(item.quantity, 10) || 1);
+
         const snap = await db
           .collection(this.productsCollection)
           .where('productCode', '==', code)
@@ -63,14 +66,14 @@ export class PharmacistReturnsService {
           const productRef  = snap.docs[0].ref;
           const beforeStock = snap.docs[0].data().stock ?? 0;
           await productRef.update({
-            stock: FieldValue.increment(item.quantity || 1),
+            stock: FieldValue.increment(qty),
           });
           restockResults.push({
             name: item.name,
             code,
             status: 'restocked',
             before: beforeStock,
-            after:  beforeStock + (item.quantity || 1),
+            after:  beforeStock + qty,
           });
         } else {
           restockResults.push({ name: item.name, code, status: 'product_not_found' });

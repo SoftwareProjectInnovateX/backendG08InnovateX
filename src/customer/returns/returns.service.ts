@@ -15,7 +15,6 @@ export class ReturnsService {
     return snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
-      // ✅ keep as _seconds so frontend reads consistently same as pharmacist side
     }));
   }
 
@@ -29,8 +28,8 @@ export class ReturnsService {
       items:          body.items          || [],
       refundAmount:   body.refundAmount   || 0,
       adjustmentNote: body.adjustmentNote || null,
-      returnStatus:   'pending',   // ✅ added — pharmacist reads this field
-      refundStatus:   'pending',   // ✅ matches Firestore field
+      returnStatus:   'pending',
+      refundStatus:   'pending',
       createdAt:      FieldValue.serverTimestamp(),
       processedAt:    null,
     });

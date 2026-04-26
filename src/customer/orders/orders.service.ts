@@ -10,6 +10,7 @@ export class OrdersService {
     const db = this.firebaseService.getDb();
     const orderPayload = {
       orderId:       body.orderId,
+      userId:        body.userId || null,
       customerName:  `${body.firstName} ${body.lastName}`,
       email:         body.email,
       phone:         body.phone,
@@ -33,7 +34,6 @@ export class OrdersService {
       .collection('CustomerOrders')
       .orderBy('createdAt', 'desc')
       .get();
-    // ✅ do NOT convert timestamps — keep raw so frontend reads _seconds same as pharmacist
     return snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
