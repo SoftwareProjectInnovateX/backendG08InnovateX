@@ -63,7 +63,7 @@ export class CustomerPrescriptionsController {
       throw new BadRequestException('customerName and customerPhone are required');
     }
 
-    const requiredEnvVars = ['EMAIL_USER', 'EMAIL_PASS', 'PHARMACIST_EMAIL', 'APP_URL'];
+    const requiredEnvVars = ['MAIL_USER', 'MAIL_PASS', 'PHARMACIST_EMAIL', 'APP_URL'];
     for (const envVar of requiredEnvVars) {
       if (!process.env[envVar]) {
         throw new InternalServerErrorException(`Missing environment variable: ${envVar}`);
@@ -90,7 +90,7 @@ export class CustomerPrescriptionsController {
         fileSize: file.size,
         mimeType: file.mimetype,
         imageUrl: `/uploads/prescriptions/${uniqueName}`,
-        status: 'pending',
+        status: 'Pending',
         customerName,
         customerPhone,
         customerAddress: customerAddress || '',
@@ -101,13 +101,13 @@ export class CustomerPrescriptionsController {
       const transporter: Transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASS,
+          user: process.env.MAIL_USER,
+          pass: process.env.MAIL_PASS,
         },
       });
 
-      await transporter.sendMail({
-        from: `"MediCareX" <${process.env.EMAIL_USER}>`,
+      transporter.sendMail({
+        from: `"MediCareX" <${process.env.MAIL_USER}>`,
         to: process.env.PHARMACIST_EMAIL,
         subject: 'New Prescription Uploaded - MediCareX',
         html: `
@@ -130,7 +130,7 @@ export class CustomerPrescriptionsController {
             content: file.buffer,
           },
         ],
-      });
+      }).catch(err => console.error('Background email error:', err));
 
       return {
         success: true,
@@ -139,7 +139,7 @@ export class CustomerPrescriptionsController {
           id: docRef.id,
           fileName: uniqueName,
           imageUrl: `/uploads/prescriptions/${uniqueName}`,
-          status: 'pending',
+          status: 'Pending',
         },
       };
     } catch (error) {
