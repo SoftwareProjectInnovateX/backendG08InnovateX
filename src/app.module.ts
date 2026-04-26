@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AppController } from './app.controller.js';
@@ -30,10 +31,12 @@ import { PharmacistModule } from './pharmacist/pharmacist.module.js';
 import { CartModule } from './customer/cart/cart.module.js';
 import { CustomerOrdersModule } from './customer/orders/orders.module.js';
 import { CustomerPrescriptionsModule } from './customer/prescriptions/customer-prescriptions.module.js';
+import { BlogModule } from './customer/blog/blog.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
 
     // Serve uploaded prescription images statically
     ServeStaticModule.forRoot({
@@ -67,6 +70,7 @@ import { CustomerPrescriptionsModule } from './customer/prescriptions/customer-p
     CartModule,
     CustomerOrdersModule,
     CustomerPrescriptionsModule,
+    BlogModule,
   ],
   controllers: [AppController],
   providers: [AppService],
