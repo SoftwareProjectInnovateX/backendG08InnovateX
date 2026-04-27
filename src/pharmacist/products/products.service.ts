@@ -6,35 +6,34 @@ import { FieldValue } from 'firebase-admin/firestore';
 export class ProductsService {
   constructor(private readonly firebaseService: FirebaseService) {}
 
-  // ==============================
-  // GET PENDING PRODUCTS (approved by admin)
-  // ==============================
+
+  // GET PRODUCTS (all approved - no status filter needed)
+  
   async getPendingProducts() {
     const db       = this.firebaseService.getDb();
     const snapshot = await db
-      .collection('pendingProducts')
-      .where('status', '==', 'approved')
-      .get();
+      .collection('products') 
+      .orderBy('createdAt', 'desc')   // ✅ changed from 'pendingProducts'
+      .get();                   // ✅ removed .where('status', '==', 'approved')
     return snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
     }));
   }
 
-  // ==============================
-  // MARK PENDING PRODUCT AS PHARMACIST APPROVED
-  // ==============================
+  // MARK PRODUCT AS PHARMACIST APPROVED
+
   async approvePending(id: string) {
     const db = this.firebaseService.getDb();
-    await db.collection('pendingProducts').doc(id).update({
+    await db.collection('products').doc(id).update({  
       status: 'pharmacist_approved',
     });
     return { success: true, id };
   }
 
-  // ==============================
+
   // ADD PRODUCT TO pharmacistProducts
-  // ==============================
+  
   async addProduct(body: any) {
     const db     = this.firebaseService.getDb();
     const docRef = await db.collection('pharmacistProducts').add({
