@@ -26,6 +26,8 @@
   },
   "exclude": [
     "node_modules",
+    "dist",
+    "set-admin-claim.ts",
     "src/customer/cartRoute.ts",
     "src/customer/upload-prescription.ts"
   ]

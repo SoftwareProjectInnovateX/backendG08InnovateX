@@ -22,6 +22,7 @@ import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
 import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders.module.js';
+import { InvoicesModule } from './supplier/invoices/invoices.module.js';
 
 // Pharmacist
 import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.module.js';
@@ -64,6 +65,7 @@ import { ContactModule } from './customer/contact/contact.module.js';
     // Supplier
     SupplierProductsModule,
     PurchaseOrdersModule,
+     InvoicesModule,
 
     // Pharmacist
     PrescriptionsModule,
