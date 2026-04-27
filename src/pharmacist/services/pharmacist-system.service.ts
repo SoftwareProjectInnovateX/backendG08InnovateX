@@ -8,22 +8,33 @@ export class PharmacistSystemService {
   async resetSystemData() {
     const db = this.firebaseService.getDb();
 
-    // 1. Clear all prescriptions
-    const rxSnapshot = await db.collection('pharmacistPrescriptions').get();
-    const rxBatch = db.batch();
-    rxSnapshot.docs.forEach((doc) => {
-      rxBatch.delete(doc.ref);
-    });
-    await rxBatch.commit();
+    const collectionsToReset = [
+      'pharmacistPrescriptions',
+      'pharmacistDispensed',
+      'CustomerOrders',
+      'prescriptions',
+      'CustomerReturns',
+      'pharmacistReturns',
+      'pharmacistNotifications',
+      'pharmacistPatients'
+    ];
 
-    // 2. Clear all dispensed history
-    const dispSnapshot = await db.collection('pharmacistDispensed').get();
-    const dispBatch = db.batch();
-    dispSnapshot.docs.forEach((doc) => {
-      dispBatch.delete(doc.ref);
-    });
-    await dispBatch.commit();
+    for (const colName of collectionsToReset) {
+      try {
+        const snapshot = await db.collection(colName).get();
+        if (snapshot.empty) continue;
 
-    return { success: true, message: 'System data reset successfully' };
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        console.log(`Cleared collection: ${colName}`);
+      } catch (e) {
+        console.error(`Failed to clear collection ${colName}:`, e);
+      }
+    }
+
+    return { success: true, message: 'System data reset successfully across all operational modules' };
   }
 }
