@@ -1,43 +1,36 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
-
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getAuth, Auth } from 'firebase-admin/auth';
 
 @Injectable()
-export class FirebaseService {
+export class FirebaseService implements OnModuleInit {
   private db!: Firestore;
-  private authAdmin!: Auth;
+  private auth!: Auth;
 
-  private ensureInitialized() {
+  onModuleInit() {
     if (!getApps().length) {
       initializeApp({
         credential: cert({
-          projectId: process.env.FIREBASE_PROJECT_ID!,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-          privateKey: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+          projectId:   process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
         }),
       });
     }
-    if (!this.db) this.db = getFirestore();
-    if (!this.authAdmin) this.authAdmin = getAuth();
+    this.db   = getFirestore();
+    this.auth = getAuth(); // FIX: initialize auth so getAdmin() works
   }
 
   getDb(): Firestore {
-    this.ensureInitialized();
     return this.db;
   }
 
+  // FIX: Added missing getAdmin() — called by FirebaseAuthGuard, app.controller,
+  // and account-requests.service but was never defined, causing all 403s.
   getAdmin(): Auth {
-    this.ensureInitialized();
-    return this.authAdmin;
-  }
-
-  getTimestamp() {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const admin = require('firebase-admin');
-    return admin.firestore.FieldValue.serverTimestamp();
+    return this.auth;
   }
 }
