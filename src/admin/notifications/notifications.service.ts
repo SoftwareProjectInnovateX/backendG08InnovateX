@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -38,7 +34,7 @@ export class NotificationsService {
     return { success: true, message: 'Notification marked as read' };
   }
 
-  // ─── PATCH mark ALL notifications as read 
+  // ─── PATCH mark ALL notifications as read ─────────────────────
   async markAllAsRead() {
     const snapshot = await this.db
       .collection('notifications')
@@ -50,13 +46,10 @@ export class NotificationsService {
     snapshot.docs.forEach((d) => batch.update(d.ref, { read: true }));
     await batch.commit();
 
-    return {
-      success: true,
-      message: `${snapshot.size} notifications marked as read`,
-    };
+    return { success: true, message: `${snapshot.size} notifications marked as read` };
   }
 
-  // ─── PATCH mark order as received (ORDER_APPROVED action) 
+  // ─── PATCH mark order as received (ORDER_APPROVED action) ─────
   async markOrderAsReceived(notificationId: string) {
     // 1. Get notification
     const notifRef = this.db.collection('notifications').doc(notificationId);
@@ -69,9 +62,7 @@ export class NotificationsService {
     const notification = notifSnap.data()!; 
 
     // 2. Get purchase order
-    const orderRef = this.db
-      .collection('purchaseOrders')
-      .doc(notification.orderId);
+    const orderRef = this.db.collection('purchaseOrders').doc(notification.orderId);
     const orderSnap = await orderRef.get();
 
     if (!orderSnap.exists) {
@@ -82,9 +73,7 @@ export class NotificationsService {
 
     // 3. Validate order status
     if (order.status !== 'APPROVED') {
-      throw new BadRequestException(
-        'Order must be APPROVED before marking as received',
-      );
+      throw new BadRequestException('Order must be APPROVED before marking as received');
     }
 
     // 4. Update purchase order to COMPLETED
@@ -95,13 +84,11 @@ export class NotificationsService {
     });
 
     // 5. Update adminProduct stock
-    const adminProductRef = this.db
-      .collection('adminProducts')
-      .doc(order.adminProductId);
+    const adminProductRef = this.db.collection('adminProducts').doc(order.adminProductId);
     const adminProductSnap = await adminProductRef.get();
 
     if (adminProductSnap.exists) {
-      const adminProduct = adminProductSnap.data()!; 
+      const adminProduct = adminProductSnap.data()!;
       await adminProductRef.update({
         stock: (adminProduct.stock || 0) + order.quantity,
         availability: 'in stock',
@@ -119,7 +106,7 @@ export class NotificationsService {
     };
   }
 
-  // ─── DELETE notification 
+  // ─── DELETE notification ───────────────────────────────────────
   async deleteNotification(notificationId: string) {
     const ref = this.db.collection('notifications').doc(notificationId);
     const snap = await ref.get();
