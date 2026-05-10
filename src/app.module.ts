@@ -28,7 +28,7 @@ import { InvoicesModule } from './supplier/invoices/invoices.module.js';
 import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.module.js';
 import { PharmacistModule } from './pharmacist/pharmacist.module.js';
 import { PharmacistProductsModule } from './pharmacist/products/products.module.js';
-
+import { AiModule } from './pharmacist/AIfeature/ai.module.js';
 // Customer
 import { CartModule } from './customer/cart/cart.module.js';
 import { CustomerOrdersModule } from './customer/orders/orders.module.js';
@@ -71,6 +71,7 @@ import { ContactModule } from './customer/contact/contact.module.js';
     PrescriptionsModule,
     PharmacistModule,
     PharmacistProductsModule,
+    AiModule ,
 
     // Customer
     CartModule,
