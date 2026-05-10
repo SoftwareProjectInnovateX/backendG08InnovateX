@@ -15,6 +15,11 @@ export class PharmacistDispensedController {
     return this.dispensedService.addDispensedRecord(dispenseData);
   }
 
+  @Put(':id/settle-payment')
+  async settlePayment(@Param('id') id: string) {
+    return this.dispensedService.updateDispensedRecord(id, { paymentStatus: 'paid' });
+  }
+
   @Put(':id')
   async updateDispensedRecord(@Param('id') id: string, @Body() updateData: any) {
     return this.dispensedService.updateDispensedRecord(id, updateData);
