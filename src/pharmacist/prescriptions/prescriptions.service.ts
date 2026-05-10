@@ -17,18 +17,36 @@ export class PrescriptionsService {
     return admin.firestore();
   }
 
+  private async uploadToFirebaseStorage(file: Express.Multer.File): Promise<string> {
+    const bucket = admin.storage().bucket();
+    const fileName = `prescriptions/${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
+    const fileUpload = bucket.file(fileName);
+
+    await fileUpload.save(file.buffer, {
+      metadata: { contentType: file.mimetype },
+      resumable: false,
+      public: true,
+      timeout: 30000,
+    });
+
+    const encodedName = encodeURIComponent(fileName);
+    return `https://storage.googleapis.com/${bucket.name}/${encodedName}`;
+  }
+
   async uploadPrescription(
     file: Express.Multer.File,
     customerName: string,
     customerPhone: string,
     customerAddress: string,
+    userId?: string,
   ) {
-    const imageUrl = `http://localhost:5000/uploads/${file.filename}`;
+    const imageUrl = await this.uploadToFirebaseStorage(file);
 
     const docRef = await this.db.collection('prescriptions').add({
       customerName,
       customerPhone,
       customerAddress,
+      userId: userId || null,
       imageUrl,
       status: 'Pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),

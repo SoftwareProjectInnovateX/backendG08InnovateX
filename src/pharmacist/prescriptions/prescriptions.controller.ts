@@ -3,8 +3,7 @@ import {
   Param, Body, UploadedFile, UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 import { PrescriptionsService } from './prescriptions.service';
 
 @Controller('prescriptions')
@@ -14,23 +13,29 @@ export class PrescriptionsController {
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('prescription', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, unique + extname(file.originalname));
-        },
-      }),
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB max
+      },
+      fileFilter: (req, file, cb) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+        if (allowed.includes(file.mimetype)) {
+          cb(null, true);
+        } else {
+          cb(new Error('Only JPG, PNG, and PDF files are allowed'), false);
+        }
+      },
     }),
   )
   async upload(
     @UploadedFile() file: Express.Multer.File,
-    @Body('customerName') customerName: string,
-    @Body('customerPhone') customerPhone: string,
+    @Body('customerName')    customerName: string,
+    @Body('customerPhone')   customerPhone: string,
     @Body('customerAddress') customerAddress: string,
+    @Body('userId')          userId: string,
   ) {
     return this.prescriptionsService.uploadPrescription(
-      file, customerName, customerPhone, customerAddress,
+      file, customerName, customerPhone, customerAddress, userId,
     );
   }
 
