@@ -18,18 +18,17 @@ export class FirebaseService implements OnModuleInit {
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
           privateKey:  process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
         }),
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET, // ✅ add this line
       });
     }
     this.db   = getFirestore();
-    this.auth = getAuth(); // FIX: initialize auth so getAdmin() works
+    this.auth = getAuth();
   }
 
   getDb(): Firestore {
     return this.db;
   }
 
-  // FIX: Added missing getAdmin() — called by FirebaseAuthGuard, app.controller,
-  // and account-requests.service but was never defined, causing all 403s.
   getAdmin(): Auth {
     return this.auth;
   }
