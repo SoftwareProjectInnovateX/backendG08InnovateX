@@ -1,70 +1,69 @@
 import { Injectable } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
 
-export interface CartItem {
-  id: string;
-  productId: string;
-  name: string;
-  price: number;
-  imageUrl?: string;
-  qty: number;
-}
-
 @Injectable()
 export class CartService {
   constructor(private readonly firebaseService: FirebaseService) {}
 
   // ==============================
-  // GET ALL ITEMS
+  // GET CART ITEMS BY CUSTOMER
   // ==============================
-  async getAll(): Promise<CartItem[]> {
+  async getCart(customerId: string) {
     const db       = this.firebaseService.getDb();
-    const snapshot = await db.collection('cart').get();
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as CartItem[];
+    const snapshot = await db
+      .collection('cart')
+      .where('customerId', '==', customerId)
+      .get();
+
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
   // ==============================
   // ADD ITEM
-  // Strip any incoming 'id' — let Firestore generate the doc ID.
   // ==============================
-  async addItem(body: any): Promise<CartItem> {
-    const db              = this.firebaseService.getDb();
-    const { id, ...rest } = body;
-    const docRef          = await db.collection('cart').add(rest);
-    return { id: docRef.id, ...rest } as CartItem;
+  async addItem(body: any) {
+    const db     = this.firebaseService.getDb();
+    const docRef = await db.collection('cart').add({
+      customerId: body.customerId,
+      productId:  body.productId,
+      name:       body.name,
+      price:      Number(body.price)  || 0,
+      imageUrl:   body.imageUrl       || '',
+      qty:        Number(body.qty)    || 1,
+    });
+    return { success: true, id: docRef.id, ...body };
   }
 
   // ==============================
-  // UPDATE QTY by Firestore doc ID
+  // UPDATE QTY
   // ==============================
-  async updateQty(id: string, qty: number): Promise<CartItem> {
+  async updateQty(id: string, qty: number) {
     const db  = this.firebaseService.getDb();
     const ref = db.collection('cart').doc(id);
     await ref.update({ qty });
     const snap = await ref.get();
-    return { id: snap.id, ...snap.data() } as CartItem;
+    return { id: snap.id, ...snap.data() };
   }
 
   // ==============================
-  // REMOVE SINGLE ITEM by Firestore doc ID
-  // Firestore .delete() silently succeeds even if doc doesn't exist —
-  // no need for an existence check, so stale IDs never cause 404s.
+  // REMOVE SINGLE ITEM
   // ==============================
-  async removeItem(id: string): Promise<{ success: boolean; id: string }> {
+  async removeItem(id: string) {
     const db = this.firebaseService.getDb();
     await db.collection('cart').doc(id).delete();
     return { success: true, id };
   }
 
   // ==============================
-  // CLEAR ENTIRE CART (batch delete)
+  // CLEAR CART BY CUSTOMER
   // ==============================
-  async clearCart(): Promise<{ success: boolean }> {
+  async clearCart(customerId: string) {
     const db       = this.firebaseService.getDb();
-    const snapshot = await db.collection('cart').get();
+    const snapshot = await db
+      .collection('cart')
+      .where('customerId', '==', customerId)
+      .get();
+
     if (snapshot.empty) return { success: true };
 
     const batch = db.batch();
