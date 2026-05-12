@@ -16,15 +16,26 @@ export class ProductsController {
     @Param('productCode') productCode: string,
     @Body() body: { quantity: number },
   ) {
-    // ✅ Validate quantity is a positive number
     if (!body.quantity || body.quantity < 1 || !Number.isInteger(body.quantity)) {
       throw new BadRequestException('Quantity must be a positive integer');
     }
-    // ✅ Validate productCode is not empty
     if (!productCode?.trim()) {
       throw new BadRequestException('Product code is required');
     }
-    //pass to service
     return this.productsService.decrementStock(productCode, body.quantity);
+  }
+
+  @Put(':productCode/increment-stock')
+  async incrementStock(
+    @Param('productCode') productCode: string,
+    @Body() body: { quantity: number },
+  ) {
+    if (!body.quantity || body.quantity < 1 || !Number.isInteger(body.quantity)) {
+      throw new BadRequestException('Quantity must be a positive integer');
+    }
+    if (!productCode?.trim()) {
+      throw new BadRequestException('Product code is required');
+    }
+    return this.productsService.incrementStock(productCode, body.quantity);
   }
 }
