@@ -13,45 +13,110 @@ export class ProductsService {
     return this.getCustomerProducts();
   }
 
+  private async findProductDoc(productCode: string) {
+    const db = this.firebaseService.getDb();
+
+    if (!productCode?.trim()) return null;
+
+    const codeSnap = await db
+      .collection('products')
+      .where('productCode', '==', productCode)
+      .get();
+    if (!codeSnap.empty) return codeSnap.docs[0];
+
+    const directDoc = await db.collection('products').doc(productCode).get();
+    if (directDoc.exists) return directDoc;
+
+    const pharmDoc = await db.collection('pharmacistProducts').doc(productCode).get();
+    if (pharmDoc.exists) {
+      const stockId = pharmDoc.data()?.stockId;
+      if (stockId) {
+        const stockSnap = await db
+          .collection('products')
+          .where('productCode', '==', stockId)
+          .get();
+        if (!stockSnap.empty) return stockSnap.docs[0];
+      }
+    }
+
+    const altPharmSnap = await db
+      .collection('pharmacistProducts')
+      .where('stockId', '==', productCode)
+      .get();
+    if (!altPharmSnap.empty) {
+      const altStockId = altPharmSnap.docs[0].data()?.stockId;
+      if (altStockId) {
+        const stockSnap = await db
+          .collection('products')
+          .where('productCode', '==', altStockId)
+          .get();
+        if (!stockSnap.empty) return stockSnap.docs[0];
+      }
+    }
+
+    return null;
+  }
+
+  private async updateAdminProductStock(productDocId: string, quantity: number) {
+    const db = this.firebaseService.getDb();
+    const adminSnap = await db
+      .collection('adminProducts')
+      .where('productId', '==', productDocId)
+      .get();
+
+    if (!adminSnap.empty) {
+      const adminStock = adminSnap.docs[0].data().stock ?? 0;
+      await adminSnap.docs[0].ref.update({
+        stock: Math.max(0, adminStock + quantity),
+      });
+    }
+  }
+
   async decrementStock(productCode: string, quantity: number) {
     if (!quantity || quantity <= 0 || !Number.isInteger(quantity)) {
       return { success: false, message: 'Invalid quantity' };
     }
 
     const db = this.firebaseService.getDb();
-
-    const productsSnap = await db
-      .collection('products')
-      .where('productCode', '==', productCode)
-      .get();
-
-    if (productsSnap.empty) {
+    const productDoc = await this.findProductDoc(productCode);
+    if (!productDoc) {
       return { success: false, message: 'Product not found' };
     }
 
     let before = 0;
     let after = 0;
-
     await db.runTransaction(async (transaction) => {
-      const docRef  = productsSnap.docs[0].ref;
-      const docSnap = await transaction.get(docRef);
+      const docSnap = await transaction.get(productDoc.ref);
       before = docSnap.data()?.stock ?? 0;
-      after  = Math.max(0, before - quantity);
-      transaction.update(docRef, { stock: after });
+      after = Math.max(0, before - quantity);
+      transaction.update(productDoc.ref, { stock: after });
     });
 
-    const adminSnap = await db
-      .collection('adminProducts')
-      .where('productId', '==', productsSnap.docs[0].id)
-      .get();
+    await this.updateAdminProductStock(productDoc.id, -quantity);
+    return { success: true, productCode, before, after };
+  }
 
-    if (!adminSnap.empty) {
-      const adminStock = adminSnap.docs[0].data().stock ?? 0;
-      await adminSnap.docs[0].ref.update({
-        stock: Math.max(0, adminStock - quantity),
-      });
+  async incrementStock(productCode: string, quantity: number) {
+    if (!quantity || quantity <= 0 || !Number.isInteger(quantity)) {
+      return { success: false, message: 'Invalid quantity' };
     }
 
+    const db = this.firebaseService.getDb();
+    const productDoc = await this.findProductDoc(productCode);
+    if (!productDoc) {
+      return { success: false, message: 'Product not found' };
+    }
+
+    let before = 0;
+    let after = 0;
+    await db.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(productDoc.ref);
+      before = docSnap.data()?.stock ?? 0;
+      after = before + quantity;
+      transaction.update(productDoc.ref, { stock: after });
+    });
+
+    await this.updateAdminProductStock(productDoc.id, quantity);
     return { success: true, productCode, before, after };
   }
 
