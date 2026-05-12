@@ -6,16 +6,16 @@ import { FieldValue } from 'firebase-admin/firestore';
 export class OrdersService {
   constructor(private readonly firebaseService: FirebaseService) {}
 
-  async createOrder(body: any) {
+  async createOrder(body: any, user: { uid: string; email?: string }) {
     try {
       const db = this.firebaseService.getDb();
 
       // ─── UNCHANGED: same order payload as before ───────────────────────
       const orderPayload = {
         orderId:       body.orderId,
-        userId:        body.userId || null,
+        userId:        user?.uid || body.userId || null,
         customerName:  `${body.firstName} ${body.lastName}`,
-        email:         body.email,
+        email:         body.email || user?.email || null,
         phone:         body.phone,
         address:       `${body.houseNumber}, ${body.laneStreet}, ${body.city}`,
         country:       body.country       || 'Sri Lanka',
@@ -62,7 +62,7 @@ export class OrdersService {
         totalOrderAmount: body.totalAmount,
         // ── cross-reference fields ──
         customerOrderId:  docRef.id,                 // links back to CustomerOrders
-        customerId:       body.userId || null,
+        customerId:       user?.uid || body.userId || null,
       });
 
       // ─── NEW: write to `purchaseOrders` collection ────────────────────
@@ -108,7 +108,7 @@ export class OrdersService {
   }
 
   // ─── UNCHANGED: getOrders ──────────────────────────────────────────────────
-  async getOrders(userId?: string) {
+  async getOrders(userId?: string, email?: string) {
     try {
       const db = this.firebaseService.getDb();
 
@@ -118,6 +118,11 @@ export class OrdersService {
 
       if (userId) {
         ref = ref.where('userId', '==', userId);
+      } else if (email) {
+        ref = ref.where('email', '==', email);
+      } else {
+        // No user identifier supplied; do not return any orders.
+        return [];
       }
 
       const snapshot = await ref.get();
