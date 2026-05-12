@@ -1,21 +1,24 @@
-import { Controller, Post, Get, Put, Body, Param, Query } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 // ─── CHANGED: added Put to imports (needed for settle-payment endpoint)
 import { OrdersService } from './orders.service';
+import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
 
 @Controller('customer-orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  // ─── UNCHANGED ─────────────────────────────────────────────────────────────
+  // ─── SECURE: only authenticated customers can create orders
+  @UseGuards(FirebaseAuthGuard)
   @Post()
-  async createOrder(@Body() body: any) {
-    return this.ordersService.createOrder(body);
+  async createOrder(@Request() req: any, @Body() body: any) {
+    return this.ordersService.createOrder(body, req.user);
   }
 
-  // ─── UNCHANGED ─────────────────────────────────────────────────────────────
+  // ─── SECURE: only authenticated customers can fetch their own orders
+  @UseGuards(FirebaseAuthGuard)
   @Get()
-  async getOrders(@Query('userId') userId?: string) {
-    return this.ordersService.getOrders(userId);
+  async getOrders(@Request() req: any) {
+    return this.ordersService.getOrders(req.user.uid, req.user.email);
   }
 
   // ─── UNCHANGED ─────────────────────────────────────────────────────────────
