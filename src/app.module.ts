@@ -25,6 +25,7 @@ import { ForecastModule } from './admin/forecast/forecast.module.js';
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
 import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders.module.js';
 import { InvoicesModule } from './supplier/invoices/invoices.module.js';
+import { AiAnalyticsModule } from './supplier/ai-analytics/ai-analytics.module.js'; 
 
 // Pharmacist
 import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.module.js';
@@ -70,6 +71,7 @@ import { ContactModule } from './customer/contact/contact.module.js';
     SupplierProductsModule,
     PurchaseOrdersModule,
      InvoicesModule,
+     AiAnalyticsModule, 
 
     // Pharmacist
     PrescriptionsModule,
