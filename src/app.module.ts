@@ -4,6 +4,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { ScheduleModule } from '@nestjs/schedule';
 
 // Shared
 import { FirebaseModule } from './shared/firebase/firebase.module.js';
@@ -18,6 +19,7 @@ import { AdminSearchModule } from './admin/search/search.module.js';
 import { AccountRequestsModule } from './admin/account-requests/account-requests.module.js';
 import { ChatModule } from './admin/chat/chat.module.js';
 import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module.js';
+import { ForecastModule } from './admin/forecast/forecast.module.js';  
 
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
@@ -61,6 +63,8 @@ import { ContactModule } from './customer/contact/contact.module.js';
     AccountRequestsModule,
     ChatModule,
     AdminProductApprovalModule,
+    ScheduleModule.forRoot(),   // enables @Cron
+    ForecastModule,
 
     // Supplier
     SupplierProductsModule,

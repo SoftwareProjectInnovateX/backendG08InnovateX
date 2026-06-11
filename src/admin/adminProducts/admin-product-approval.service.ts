@@ -3,12 +3,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service.js';
 import { CountersService } from '../../shared/counters/counters.service.js';
 import { Timestamp } from 'firebase-admin/firestore';
+import { MailService } from '../../shared/mail/mail.service.js';
 
 @Injectable()
 export class AdminProductApprovalService {
   constructor(
     private readonly firebaseService: FirebaseService,
     private readonly countersService: CountersService,
+    private readonly mailService: MailService,
   ) {}
 
   // ── GET /admin/pending-products
@@ -110,6 +112,18 @@ export class AdminProductApprovalService {
       createdAt: Timestamp.now(),
     });
 
+    // ✅ Fixed: use data.supplierEmail for the `to` field
+    if (data.supplierEmail) {
+      await this.mailService.sendProductApprovedEmail({
+        to:           data.supplierEmail,
+        supplierName: data.supplierName,
+        productName:  data.productName,
+        productCode,
+      });
+    } else {
+      console.warn(`[ApproveProduct] No supplierEmail found for supplierId: ${data.supplierId}. Email not sent.`);
+    }
+
     return { success: true, productId: productRef.id, productCode };
   }
 
@@ -146,6 +160,18 @@ export class AdminProductApprovalService {
       read:      false,
       createdAt: Timestamp.now(),
     });
+
+    // ✅ Fixed: use data.supplierEmail for the `to` field
+    if (data.supplierEmail) {
+      await this.mailService.sendProductRejectedEmail({
+        to:           data.supplierEmail,
+        supplierName: data.supplierName,
+        productName:  data.productName,
+        reason,
+      });
+    } else {
+      console.warn(`[RejectProduct] No supplierEmail found for supplierId: ${data.supplierId}. Email not sent.`);
+    }
 
     return { success: true };
   }

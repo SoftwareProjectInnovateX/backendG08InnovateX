@@ -1,56 +1,49 @@
-import {
-  IsString,
-  IsNumber,
-  IsOptional,
-  IsArray,
-  ValidateNested,
-  IsIn,
-} from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsArray, ValidateNested, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class InvoiceItemDto {
   @IsString()
-  productName: string;
+    productName!: string;
 
   @IsNumber()
-  quantity: number;
+    quantity!: number;
 
   @IsNumber()
-  unitPrice: number;
+    unitPrice!: number;
 }
 
 export class GeneratePdfDto {
   @IsString()
-  invoiceNumber: string;
+    invoiceNumber!: string;
 
   @IsString()
-  pharmacy: string;
+    pharmacy!: string;
 
   @IsString()
-  @IsIn(['INITIAL', 'FINAL'])
-  invoiceType: string;
+    @IsIn(['INITIAL', 'FINAL'])
+    invoiceType!: string;
 
   @IsString()
   @IsOptional()
   invoiceLabel?: string;
 
   @IsString()
-  @IsIn(['Paid', 'Pending', 'Overdue'])
-  paymentStatus: string;
+    @IsIn(['Paid', 'Pending', 'Overdue'])
+    paymentStatus!: string;
 
   @IsString()
-  invoiceDate: string;
+    invoiceDate!: string;
 
   @IsString()
-  dueDate: string;
+    dueDate!: string;
 
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => InvoiceItemDto)
-  items: InvoiceItemDto[];
+    @ValidateNested({ each: true })
+    @Type(() => InvoiceItemDto)
+    items!: InvoiceItemDto[];
 
   @IsNumber()
-  totalAmount: number;
+    totalAmount!: number;
 
   @IsNumber()
   @IsOptional()
