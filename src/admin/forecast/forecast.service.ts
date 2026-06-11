@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
 interface OrderType {
   id?: string;
@@ -53,19 +53,11 @@ export interface ForecastResult {
   isExpired: boolean;
 }
 
-const COMPLETED_STATUSES = [
-  'Paid',
-  'paid',
-  'PAID',
-  'delivered',
-  'completed',
-];
+const COMPLETED_STATUSES = ['Paid', 'paid', 'PAID', 'delivered', 'completed'];
 
 @Injectable()
 export class ForecastService {
-  private genAI = new GoogleGenerativeAI(
-    process.env.GEMINI_API_KEY ?? '',
-  );
+  private readonly logger = new Logger(ForecastService.name);
 
   constructor(private readonly firebaseService: FirebaseService) {}
 
@@ -76,23 +68,17 @@ export class ForecastService {
     ]);
 
     const salesMap = this.aggregateSalesByProductId(orders);
-
     const now = new Date();
 
-    const results = products.map((product) => {
+    return products.map((product) => {
       const sales = salesMap.get(product.id) ?? {
         totalSold: 0,
         dailySales: new Array(7).fill(0),
       };
 
-      const { forecast7d, forecast30d, dailyAvg } =
-        this.predictDemand(sales.dailySales);
+      const { forecast7d, forecast30d, dailyAvg } = this.predictDemand(sales.dailySales);
 
-      const risk = this.calculateStockRisk(
-        product.stock,
-        forecast7d,
-        product.minStock,
-      );
+      const risk = this.calculateStockRisk(product.stock, forecast7d, product.minStock);
 
       const daysUntilStockout =
         dailyAvg > 0 ? Math.floor(product.stock / dailyAvg) : null;
@@ -119,26 +105,17 @@ export class ForecastService {
         isExpired,
       };
     });
-
-    return results;
   }
 
   async saveForecastSnapshot(): Promise<void> {
     const db = this.firebaseService.getDb();
     const results = await this.getForecast();
     const batch = db.batch();
-
     const today = new Date().toISOString().split('T')[0];
 
     for (const item of results) {
-      const ref = db
-        .collection('salesForecasts')
-        .doc(`${today}_${item.productId}`);
-
-      batch.set(ref, {
-        ...item,
-        generatedAt: new Date(),
-      });
+      const ref = db.collection('salesForecasts').doc(`${today}_${item.productId}`);
+      batch.set(ref, { ...item, generatedAt: new Date() });
     }
 
     await batch.commit();
@@ -156,10 +133,7 @@ export class ForecastService {
       .get();
 
     return snapshot.docs
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      } as CustomerOrder))
+      .map((doc) => ({ id: doc.id, ...doc.data() } as CustomerOrder))
       .filter(
         (order) =>
           COMPLETED_STATUSES.includes(order.orderStatus ?? '') ||
@@ -169,12 +143,10 @@ export class ForecastService {
 
   private async fetchProducts(): Promise<ProductDoc[]> {
     const db = this.firebaseService.getDb();
-
     const snapshot = await db.collection('adminProducts').get();
 
     return snapshot.docs.map((doc) => {
       const d = doc.data();
-
       return {
         id: doc.id,
         productName: d.productName ?? '',
@@ -194,11 +166,7 @@ export class ForecastService {
   private aggregateSalesByProductId(
     orders: CustomerOrder[],
   ): Map<string, { totalSold: number; dailySales: number[] }> {
-    const map = new Map<
-      string,
-      { totalSold: number; dailySales: number[] }
-    >();
-
+    const map = new Map<string, { totalSold: number; dailySales: number[] }>();
     const now = Date.now();
     const MS_PER_DAY = 86400000;
 
@@ -206,24 +174,18 @@ export class ForecastService {
       const orderDate = order.createdAt?.toDate?.() ?? new Date();
       const daysAgo = Math.floor((now - orderDate.getTime()) / MS_PER_DAY);
       const slotIndex = 6 - daysAgo;
-
       const items = order.items ?? order.types ?? [];
 
       for (const item of items) {
         if (!item.id) continue;
 
-        const productId = item.id;
         const qty = item.quantity ?? 1;
 
-        if (!map.has(productId)) {
-          map.set(productId, {
-            totalSold: 0,
-            dailySales: new Array(7).fill(0),
-          });
+        if (!map.has(item.id)) {
+          map.set(item.id, { totalSold: 0, dailySales: new Array(7).fill(0) });
         }
 
-        const entry = map.get(productId)!;
-
+        const entry = map.get(item.id)!;
         entry.totalSold += qty;
 
         if (slotIndex >= 0 && slotIndex <= 6) {
@@ -257,33 +219,84 @@ export class ForecastService {
     return 'Low';
   }
 
+  private generateFallbackInsight(product: ForecastResult): string {
+    if (product.isExpired) {
+      return 'This product has expired. Remove it from inventory and avoid further sales.';
+    }
+    if (product.risk === 'High') {
+      return 'High stock risk detected. Reorder immediately to prevent shortages.';
+    }
+    if (product.risk === 'Medium') {
+      return 'Stock levels are becoming low. Consider replenishing inventory soon.';
+    }
+    return 'Stock levels are healthy and sufficient for forecasted demand.';
+  }
+
   async getAiInsight(productId: string): Promise<{ insight: string }> {
-    const results = await this.getForecast();
-    const product = results.find((p) => p.productId === productId);
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      this.logger.error('GROQ_API_KEY is not set in environment variables');
+      return { insight: 'AI insight unavailable: missing API key.' };
+    }
+
+    let product: ForecastResult | undefined;
+    try {
+      const results = await this.getForecast();
+      product = results.find((p) => p.productId === productId);
+    } catch (err) {
+      this.logger.error('getForecast() failed inside getAiInsight', err);
+      throw err;
+    }
 
     if (!product) {
       return { insight: 'Product not found.' };
     }
 
-    const model = this.genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
-    });
-
     const prompt = `
-Analyse this pharmacy product stock.
-
+You are a pharmacy inventory analyst.
 Product: ${product.productName}
-Current stock: ${product.stock}
-Forecast 7 days: ${product.forecast7d}
-Risk: ${product.risk}
-
-Give stock recommendation in 2 short sentences.
+Current Stock: ${product.stock}
+Minimum Stock: ${product.minStock}
+Daily Average Sales: ${product.dailyAvg}
+Forecast Next 7 Days: ${product.forecast7d}
+Forecast Next 30 Days: ${product.forecast30d}
+Days Until Stockout: ${product.daysUntilStockout ?? 'Unknown'}
+Risk Level: ${product.risk}
+Expired: ${product.isExpired}
+Provide:
+1. A short inventory assessment.
+2. A clear recommendation.
+Maximum 2 sentences.
 `;
 
-    const result = await model.generateContent(prompt);
+    try {
+      const client = new OpenAI({
+        apiKey,
+        baseURL: 'https://api.groq.com/openai/v1',
+      });
 
-    return {
-      insight: result.response.text(),
-    };
+      const completion = await client.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 100,
+      });
+
+      return {
+        insight:
+          completion.choices[0]?.message?.content?.trim() ??
+          this.generateFallbackInsight(product),
+      };
+    } catch (err: any) {
+      this.logger.error('Groq API call failed', err?.message ?? err);
+      return {
+        insight: this.generateFallbackInsight(product),
+      };
+    }
   }
 }
