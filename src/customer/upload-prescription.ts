@@ -12,12 +12,11 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 
-import * as fs from 'fs';
-import * as path from 'path';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
+import { v2 as cloudinary } from 'cloudinary';
 
-// ✅ Firebase Admin SDK (matches your backend setup)
+// ✅ Firebase Admin SDK
 import * as admin from 'firebase-admin';
 
 interface PrescriptionBody {
@@ -36,13 +35,38 @@ interface MulterFile {
   size: number;
 }
 
+// ✅ Configure Cloudinary once at module level
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// ✅ Upload buffer to Cloudinary, returns secure URL
+function uploadToCloudinary(file: MulterFile): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder:        'prescriptions',
+        resource_type: 'auto', // handles images AND PDFs
+      },
+    (error, result) => {
+  if (error) return reject(error);
+  if (!result) return reject(new Error('Cloudinary upload returned no result'));
+  resolve(result.secure_url);
+},
+    );
+    stream.end(file.buffer);
+  });
+}
+
 @Controller('prescriptions')
 export class PrescriptionController {
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('prescription', {
-      storage: memoryStorage(), // ✅ keep file in memory as buffer
-      limits: { fileSize: 5 * 1024 * 1024 }, // ✅ 5MB max
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
       fileFilter: (req, file, callback) => {
         const allowedMimes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
         if (allowedMimes.includes(file.mimetype)) {
@@ -69,7 +93,10 @@ export class PrescriptionController {
     }
 
     // ✅ Validate env variables
-    const requiredEnvVars = ['EMAIL_USER', 'EMAIL_PASS', 'PHARMACIST_EMAIL', 'APP_URL'];
+    const requiredEnvVars = [
+      'EMAIL_USER', 'EMAIL_PASS', 'PHARMACIST_EMAIL',
+      'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET',
+    ];
     for (const envVar of requiredEnvVars) {
       if (!process.env[envVar]) {
         throw new InternalServerErrorException(`Missing environment variable: ${envVar}`);
@@ -77,42 +104,25 @@ export class PrescriptionController {
     }
 
     try {
-      // ✅ Create upload folder
-      const uploadsDir = path.join(
-        process.cwd(),
-        'public',
-        'uploads',
-        'prescriptions',
-      );
+      // ✅ Upload to Cloudinary — get back a public URL
+      const imageUrl = await uploadToCloudinary(file);
 
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-
-      // ✅ Sanitize filename & make unique
-      const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-      const uniqueName = `${Date.now()}-${sanitizedOriginalName}`;
-      const filePath = path.join(uploadsDir, uniqueName);
-
-      // ✅ Save file to disk
-      fs.writeFileSync(filePath, file.buffer);
-
-      // ✅ Save to Firestore using Admin SDK
+      // ✅ Save to Firestore
       const db = admin.firestore();
       const docRef = await db.collection('prescriptions').add({
-        fileName: uniqueName,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        imageUrl: `/uploads/prescriptions/${uniqueName}`,
-        status: 'pending',
+        fileName:        file.originalname,
+        fileSize:        file.size,
+        mimeType:        file.mimetype,
+        imageUrl,                                          // ✅ clean Cloudinary URL
+        status:          'Pending',
         customerName,
         customerPhone,
         customerAddress: customerAddress || '',
-        userId: userId || null,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        userId:          userId || null,
+        createdAt:       admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // ✅ Send email with attachment
+      // ✅ Send email notification with image link
       const transporter: Transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -122,27 +132,24 @@ export class PrescriptionController {
       });
 
       await transporter.sendMail({
-        from: `"MediCareX" <${process.env.EMAIL_USER}>`,
-        to: process.env.PHARMACIST_EMAIL,
+        from:    `"MediCareX" <${process.env.EMAIL_USER}>`,
+        to:      process.env.PHARMACIST_EMAIL,
         subject: 'New Prescription Uploaded - MediCareX',
         html: `
           <h2>New Prescription Uploaded</h2>
           <p><b>Customer Name:</b> ${customerName}</p>
           <p><b>Phone:</b> ${customerPhone}</p>
-          <p><b>Address:</b> ${customerAddress}</p>
-          <p><b>File Name:</b> ${uniqueName}</p>
-          <p><b>Size:</b> ${(file.size / 1024 / 1024).toFixed(2)} MB</p>
+          <p><b>Address:</b> ${customerAddress || 'N/A'}</p>
+          <p><b>File:</b> ${file.originalname} (${(file.size / 1024 / 1024).toFixed(2)} MB)</p>
           <p><b>Upload Time:</b> ${new Date().toLocaleString()}</p>
           <p>
-            <a href="${process.env.APP_URL}/uploads/prescriptions/${uniqueName}">
-              View Prescription
-            </a>
+            <a href="${imageUrl}">View Prescription Image</a>
           </p>
         `,
         attachments: [
           {
-            filename: uniqueName,
-            content: file.buffer, // ✅ pass buffer directly, no need for base64 string
+            filename: file.originalname,
+            content:  file.buffer,
           },
         ],
       });
@@ -151,23 +158,23 @@ export class PrescriptionController {
         success: true,
         message: 'Prescription uploaded and pharmacist notified',
         prescription: {
-          id: docRef.id,
-          fileName: uniqueName,
-          fileSize: file.size,
-          mimeType: file.mimetype,
-          imageUrl: `/uploads/prescriptions/${uniqueName}`,
-          status: 'pending',
+          id:              docRef.id,
+          fileName:        file.originalname,
+          fileSize:        file.size,
+          mimeType:        file.mimetype,
+          imageUrl,
+          status:          'Pending',
           customerName,
           customerPhone,
           customerAddress: customerAddress || '',
-          userId: userId || null,
-          createdAt: new Date().toISOString(),
+          userId:          userId || null,
+          createdAt:       new Date().toISOString(),
         },
       };
+
     } catch (error) {
       console.error('Upload error:', error);
 
-      // ✅ Re-throw NestJS HTTP exceptions as-is
       if (
         error instanceof BadRequestException ||
         error instanceof InternalServerErrorException
