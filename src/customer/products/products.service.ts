@@ -57,6 +57,12 @@ export class ProductsService {
     return null;
   }
 
+  async getProductCategory(productCode: string) {
+    const productDoc = await this.findProductDoc(productCode);
+    if (!productDoc || !productDoc.exists) return '';
+    return String(productDoc.data()?.category || '');
+  }
+
   private async updateAdminProductStock(productDocId: string, quantity: number) {
     const db = this.firebaseService.getDb();
     const adminSnap = await db
