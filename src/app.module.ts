@@ -40,6 +40,7 @@ import { ReturnsModule } from './customer/returns/returns.module.js';
 import { ProfileModule } from './customer/profile/profile.module.js';
 import { BrandsModule } from './customer/brands/brands.module.js';
 import { ContactModule } from './customer/contact/contact.module.js';
+import { LoyaltyModule } from './customer/loyalty/loyalty.module.js';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { ContactModule } from './customer/contact/contact.module.js';
     ProfileModule,
     BrandsModule,
     ContactModule,
+    LoyaltyModule,
   ],
   controllers: [AppController],
   providers: [AppService],
