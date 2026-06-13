@@ -9,10 +9,11 @@ type Visibility = typeof VALID_VISIBILITY[number];
 export class ProductsService {
   constructor(private readonly firebaseService: FirebaseService) {}
 
+  // ── Read from pendingProducts (not products) ──────────────────────────────
   async getPendingProducts() {
     const db       = this.firebaseService.getDb();
     const snapshot = await db
-      .collection('products')
+      .collection('pendingProducts')   // ✅ fixed collection
       .get();
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
@@ -42,12 +43,10 @@ export class ProductsService {
         const data = doc.data();
         stockMap[data.productCode || doc.id] = data.stock ?? 0;
       });
-      console.log('stockMap keys:', Object.keys(stockMap));
 
       return productList.map(p => {
         const stockId     = (p as any).stockId;
         const productCode = (p as any).productCode;
-        console.log('Matching:', stockId, productCode, '→ stock:', stockMap[stockId], stockMap[productCode]);
         return {
           ...p,
           stock: stockMap[stockId] ?? stockMap[productCode] ?? 0,
@@ -59,11 +58,10 @@ export class ProductsService {
     }
   }
 
+  // ── Delete from pendingProducts so it disappears from the list ────────────
   async approvePending(id: string) {
     const db = this.firebaseService.getDb();
-    await db.collection('products').doc(id).update({
-      status: 'pharmacist_approved',
-    });
+    await db.collection('pendingProducts').doc(id).delete();  // ✅ fixed
     return { success: true, id };
   }
 
@@ -106,5 +104,116 @@ export class ProductsService {
       .update({ visibility });
 
     return { success: true, id, visibility };
+  }
+
+  async getProducts(category?: string) {
+    return this.getCustomerProducts();
+  }
+
+  private async findProductDoc(productCode: string) {
+    const db = this.firebaseService.getDb();
+
+    if (!productCode?.trim()) return null;
+
+    const codeSnap = await db
+      .collection('products')
+      .where('productCode', '==', productCode)
+      .get();
+    if (!codeSnap.empty) return codeSnap.docs[0];
+
+    const directDoc = await db.collection('products').doc(productCode).get();
+    if (directDoc.exists) return directDoc;
+
+    const pharmDoc = await db.collection('pharmacistProducts').doc(productCode).get();
+    if (pharmDoc.exists) {
+      const stockId = pharmDoc.data()?.stockId;
+      if (stockId) {
+        const stockSnap = await db
+          .collection('products')
+          .where('productCode', '==', stockId)
+          .get();
+        if (!stockSnap.empty) return stockSnap.docs[0];
+      }
+    }
+
+    const altPharmSnap = await db
+      .collection('pharmacistProducts')
+      .where('stockId', '==', productCode)
+      .get();
+    if (!altPharmSnap.empty) {
+      const altStockId = altPharmSnap.docs[0].data()?.stockId;
+      if (altStockId) {
+        const stockSnap = await db
+          .collection('products')
+          .where('productCode', '==', altStockId)
+          .get();
+        if (!stockSnap.empty) return stockSnap.docs[0];
+      }
+    }
+
+    return null;
+  }
+
+  async decrementStock(productCode: string, quantity: number) {
+    if (!quantity || quantity <= 0 || !Number.isInteger(quantity)) {
+      return { success: false, message: 'Invalid quantity' };
+    }
+
+    const db = this.firebaseService.getDb();
+    const productDoc = await this.findProductDoc(productCode);
+    if (!productDoc) {
+      return { success: false, message: 'Product not found' };
+    }
+
+    let before = 0;
+    let after  = 0;
+    await db.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(productDoc.ref);
+      before = docSnap.data()?.stock ?? 0;
+      after  = Math.max(0, before - quantity);
+      transaction.update(productDoc.ref, { stock: after });
+    });
+
+    await this.updateAdminProductStock(productDoc.id, -quantity);
+    return { success: true, productCode, before, after };
+  }
+
+  async incrementStock(productCode: string, quantity: number) {
+    if (!quantity || quantity <= 0 || !Number.isInteger(quantity)) {
+      return { success: false, message: 'Invalid quantity' };
+    }
+
+    const db = this.firebaseService.getDb();
+    const productDoc = await this.findProductDoc(productCode);
+    if (!productDoc) {
+      return { success: false, message: 'Product not found' };
+    }
+
+    let before = 0;
+    let after  = 0;
+    await db.runTransaction(async (transaction) => {
+      const docSnap = await transaction.get(productDoc.ref);
+      before = docSnap.data()?.stock ?? 0;
+      after  = before + quantity;
+      transaction.update(productDoc.ref, { stock: after });
+    });
+
+    await this.updateAdminProductStock(productDoc.id, quantity);
+    return { success: true, productCode, before, after };
+  }
+
+  private async updateAdminProductStock(productDocId: string, quantity: number) {
+    const db        = this.firebaseService.getDb();
+    const adminSnap = await db
+      .collection('adminProducts')
+      .where('productId', '==', productDocId)
+      .get();
+
+    if (!adminSnap.empty) {
+      const adminStock = adminSnap.docs[0].data().stock ?? 0;
+      await adminSnap.docs[0].ref.update({
+        stock: Math.max(0, adminStock + quantity),
+      });
+    }
   }
 }
