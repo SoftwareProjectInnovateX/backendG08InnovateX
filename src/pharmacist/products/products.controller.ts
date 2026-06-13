@@ -1,49 +1,76 @@
-import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Param, Body, Query, BadRequestException } from '@nestjs/common';
 import { ProductsService } from './products.service';
 
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
-  // ── Pending products from admin (products collection) ──────────────────────
+  // ── Get all customer-visible products ─────────────────────────────────────
+  @Get()
+  async getProducts(@Query('category') category?: string) {
+    return this.productsService.getProducts(category);
+  }
+
+  // ── Get pending products from admin ───────────────────────────────────────
   @Get('pending')
   async getPendingProducts() {
     return this.productsService.getPendingProducts();
   }
 
-  // ── All pharmacist products (pharmacistProducts collection) ────────────────
-  @Get()
+  // ── Get all pharmacist products ────────────────────────────────────────────
+  @Get('all')
   async getAllPharmacistProducts() {
     return this.productsService.getAllPharmacistProducts();
   }
 
-  // ── Customer-visible products only ─────────────────────────────────────────
-  // Your customer page should call GET /products/customer
-  @Get('customer')
-  async getCustomerProducts() {
-    return this.productsService.getCustomerProducts();
-  }
-
-  // ── Mark admin product as pharmacist-approved ──────────────────────────────
-  @Patch('pending/:id/approve')
-  async approvePending(@Param('id') id: string) {
-    return this.productsService.approvePending(id);
-  }
-
-  // ── Add product to pharmacistProducts (with visibility) ───────────────────
+  // ── Add a new product ──────────────────────────────────────────────────────
   @Post()
   async addProduct(@Body() body: any) {
     return this.productsService.addProduct(body);
   }
 
-  // ── Toggle visibility of an existing pharmacistProduct ────────────────────
-  // Called by PharmacistProductsPage toggle button
-  // Body: { visibility: "customer" | "pharmacist_only" }
+  // ── Approve a pending product (deletes from pendingProducts) ──────────────
+  @Patch('pending/:id/approve')
+  async approvePending(@Param('id') id: string) {
+    return this.productsService.approvePending(id);
+  }
+
+  // ── Update product visibility ─────────────────────────────────────────────
   @Patch(':id/visibility')
   async updateVisibility(
     @Param('id') id: string,
     @Body() body: { visibility: string },
   ) {
     return this.productsService.updateVisibility(id, body.visibility);
+  }
+
+  // ── Decrement stock when added to cart ────────────────────────────────────
+  @Put(':productCode/decrement-stock')
+  async decrementStock(
+    @Param('productCode') productCode: string,
+    @Body() body: { quantity: number },
+  ) {
+    if (!body.quantity || body.quantity < 1 || !Number.isInteger(body.quantity)) {
+      throw new BadRequestException('Quantity must be a positive integer');
+    }
+    if (!productCode?.trim()) {
+      throw new BadRequestException('Product code is required');
+    }
+    return this.productsService.decrementStock(productCode, body.quantity);
+  }
+
+  // ── Increment stock ────────────────────────────────────────────────────────
+  @Put(':productCode/increment-stock')
+  async incrementStock(
+    @Param('productCode') productCode: string,
+    @Body() body: { quantity: number },
+  ) {
+    if (!body.quantity || body.quantity < 1 || !Number.isInteger(body.quantity)) {
+      throw new BadRequestException('Quantity must be a positive integer');
+    }
+    if (!productCode?.trim()) {
+      throw new BadRequestException('Product code is required');
+    }
+    return this.productsService.incrementStock(productCode, body.quantity);
   }
 }
