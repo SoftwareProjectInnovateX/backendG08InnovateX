@@ -19,21 +19,71 @@ export class CartService {
       .where('customerId', '==', customerId)
       .get();
 
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const merged = new Map<string, any>();
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const productId = data.productId || data.stockId || doc.id;
+      const existing = merged.get(productId);
+      if (!existing) {
+        merged.set(productId, { id: doc.id, ...data });
+      } else {
+        existing.qty = Number(existing.qty || 0) + Number(data.qty || 0);
+        if (!existing.category && data.category) {
+          existing.category = data.category;
+        }
+      }
+    }
+
+    return Array.from(merged.values());
   }
 
   // ==============================
   // ADD ITEM
   // ==============================
   async addItem(body: any) {
-    const db     = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
+    const productId = body.productId?.toString()?.trim() || '';
+
+    if (!productId || !body.customerId) {
+      return { success: false, message: 'Missing productId or customerId' };
+    }
+
+    const existingSnap = await db
+      .collection('cart')
+      .where('customerId', '==', body.customerId)
+      .where('productId', '==', productId)
+      .get();
+
+    if (!existingSnap.empty) {
+      const docs = existingSnap.docs;
+      const keptDoc = docs[0];
+      const existingQty = docs.reduce((sum, doc) => sum + Number(doc.data()?.qty || 0), 0);
+      const newQty = existingQty + Number(body.qty || 1);
+
+      if (docs.length > 1) {
+        const batch = db.batch();
+        docs.slice(1).forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+      }
+
+      const existingData = keptDoc.data();
+      if ((!existingData.category || existingData.category === '') && body.category) {
+        await keptDoc.ref.update({ category: body.category });
+      }
+
+      await this.updateQty(keptDoc.id, newQty);
+      return { success: true, id: keptDoc.id, productId, qty: newQty };
+    }
+
     const docRef = await db.collection('cart').add({
       customerId: body.customerId,
-      productId:  body.productId,
-      stockId:    body.stockId || body.productId || '',
+      productId:  productId,
+      stockId:    body.stockId || productId,
       name:       body.name,
       price:      Number(body.price)  || 0,
       imageUrl:   body.imageUrl       || '',
+      category:   body.category       || '',
       qty:        Number(body.qty)    || 1,
     });
     return { success: true, id: docRef.id, ...body };
