@@ -6,16 +6,100 @@ import { FieldValue } from 'firebase-admin/firestore';
 export class ProfileService {
   constructor(private readonly firebaseService: FirebaseService) {}
 
-  async getProfile(uid: string) {
-    const db   = this.firebaseService.getDb();
-    const snap = await db.collection('users').doc(uid).get();
+  // Mirrors loyalty.service.ts calculateLevel() — keep thresholds in sync
+  private calculateLevel(points: number): 'Silver' | 'Gold' | 'Platinum' {
+    if (points >= 5000) return 'Platinum';
+    if (points >= 2000) return 'Gold';
+    return 'Silver';
+  }
 
-    if (!snap.exists) throw new NotFoundException('User not found');
+  // Calculate loyalty data from CustomerOrders for a given uid
+  private async getLoyaltyFromOrders(uid: string, db: any) {
+    const ordersSnap = await db
+      .collection('CustomerOrders')
+      .where('userId', '==', uid)
+      .get();
+
+    if (ordersSnap.empty) {
+      return { loyaltyPoints: 0, level: 'Silver', recommendedOffers: [] };
+    }
+
+    const totalPoints = ordersSnap.docs.reduce((sum: number, doc: any) => {
+      return sum + Math.floor(doc.data().totalAmount || 0);
+    }, 0);
 
     return {
-      id: snap.id,
-      ...snap.data(),
+      loyaltyPoints:     totalPoints,
+      level:             this.calculateLevel(totalPoints),
+      recommendedOffers: [],
     };
+  }
+
+  async getProfile(uid: string) {
+    const db = this.firebaseService.getDb();
+
+    // Fetch user doc and loyalty collection doc in parallel
+    const [snap, loyaltySnap] = await Promise.all([
+      db.collection('users').doc(uid).get(),
+      db.collection('loyaltyCustomers').doc(uid).get(),
+    ]);
+
+    // Determine loyalty data:
+    // 1. Use loyaltyCustomers doc if it exists
+    // 2. Otherwise calculate from CustomerOrders
+    let loyaltyData;
+    if (loyaltySnap.exists) {
+      const l = loyaltySnap.data();
+      loyaltyData = {
+        loyaltyPoints:     l?.totalPoints       ?? 0,
+        level:             l?.level             ?? 'Silver',
+        recommendedOffers: l?.recommendedOffers ?? [],
+      };
+    } else {
+      loyaltyData = await this.getLoyaltyFromOrders(uid, db);
+    }
+
+    // If users doc exists, merge and return
+    if (snap.exists) {
+      return {
+        id: snap.id,
+        ...snap.data(),
+        ...loyaltyData,
+      };
+    }
+
+    // Fallback: build profile from CustomerOrders if no users doc
+    const ordersSnap = await db
+      .collection('CustomerOrders')
+      .where('userId', '==', uid)
+      .limit(1)
+      .get();
+
+    if (!ordersSnap.empty) {
+      const order = ordersSnap.docs[0].data();
+
+      // Auto-create users doc so future calls are faster
+      await db.collection('users').doc(uid).set({
+        fullName:  order.customerName || '',
+        email:     order.email        || '',
+        phone:     order.phone        || '',
+        role:      'customer',
+        status:    'active',
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        id:       uid,
+        fullName: order.customerName || '',
+        email:    order.email        || '',
+        phone:    order.phone        || '',
+        role:     'customer',
+        status:   'active',
+        ...loyaltyData,
+      };
+    }
+
+    throw new NotFoundException('User not found');
   }
 
   async updateProfile(uid: string, body: any) {
