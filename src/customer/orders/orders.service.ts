@@ -1,16 +1,40 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
+import { ProductsService } from '../products/products.service';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 import { FieldValue } from 'firebase-admin/firestore';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly firebaseService: FirebaseService) {}
+  constructor(
+    private readonly firebaseService: FirebaseService,
+    private readonly productsService: ProductsService,
+    private readonly loyaltyService: LoyaltyService,
+  ) {}
+
+  private async normalizeOrderItems(items: any[]) {
+    return Promise.all(
+      (items || []).map(async (item: any) => {
+        const category = item.category ||
+          (item.productId ? await this.productsService.getProductCategory(item.productId) : '') ||
+          (item.stockId ? await this.productsService.getProductCategory(item.stockId) : '');
+
+        return {
+          ...item,
+          category,
+        };
+      })
+    );
+  }
 
   async createOrder(body: any, user: { uid: string; email?: string }) {
     try {
       const db = this.firebaseService.getDb();
 
-      // ─── UNCHANGED: same order payload as before ───────────────────────
+      // ─── Read items from body (frontend sends field named 'items') ──────
+      const rawItems = body.items || [];
+      const normalizedItems = await this.normalizeOrderItems(rawItems);
+
       const orderPayload = {
         orderId:       body.orderId,
         userId:        user?.uid || body.userId || null,
@@ -24,23 +48,19 @@ export class OrdersService {
         paymentStatus: body.paymentMethod === 'ONLINE' ? 'paid' : 'pending',
         orderStatus:   body.orderStatus   || 'pending',
         totalAmount:   body.totalAmount,
-        types:         body.items         || [],
+        categories:    [...new Set(normalizedItems.map((item: any) => item.category || '').filter(Boolean))],
+        types:         normalizedItems,
         createdAt:     FieldValue.serverTimestamp(),
       };
 
-      // ─── UNCHANGED: save to CustomerOrders ─────────────────────────────
       const docRef = await db.collection('CustomerOrders').add(orderPayload);
 
-      // ─── NEW: generate a PO ID for cross-referencing ───────────────────
       const poId = `PO-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-      // ─── NEW: write to `payments` collection ──────────────────────────
-      // Records the initial payment entry linked to this customer order.
-      // dueDate is set 7 days from now for pending payments.
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7);
 
-      const firstItem = (body.items || [])[0];
+      const firstItem = normalizedItems[0] || rawItems[0] || {};
 
       await db.collection('payments').add({
         amount:           body.totalAmount,
@@ -52,21 +72,18 @@ export class OrdersService {
                             : 'Cash on Delivery',
         paymentType:      body.paymentMethod === 'ONLINE' ? 'ONLINE' : 'COD',
         productName:      firstItem?.name || '',
-        purchaseOrderId:  '',                        // filled when PO doc is created below
-        quantity:         (body.items || []).reduce(
+        purchaseOrderId:  '',
+        quantity:         rawItems.reduce(
                             (sum: number, i: any) => sum + (i.quantity || 1), 0
                           ),
         status:           body.paymentMethod === 'ONLINE' ? 'PAID' : 'PENDING',
         supplierId:       null,
         supplierName:     null,
         totalOrderAmount: body.totalAmount,
-        // ── cross-reference fields ──
-        customerOrderId:  docRef.id,                 // links back to CustomerOrders
+        customerOrderId:  docRef.id,
         customerId:       user?.uid || body.userId || null,
       });
 
-      // ─── NEW: write to `purchaseOrders` collection ────────────────────
-      // Creates a purchase order entry so pharmacist can track fulfilment.
       const poRef = await db.collection('purchaseOrders').add({
         deliveredAt:            null,
         initialPaymentDate:     FieldValue.serverTimestamp(),
@@ -77,16 +94,14 @@ export class OrdersService {
         poId:                   poId,
         product:                firstItem?.name  || '',
         productId:              firstItem?.id    || '',
-        quantity:               (body.items || []).reduce(
+        quantity:               rawItems.reduce(
                                   (sum: number, i: any) => sum + (i.quantity || 1), 0
                                 ),
         reorderLevel:           0,
         status:                 'PENDING',
-        // ── cross-reference field ──
-        customerOrderId:        docRef.id,           // links back to CustomerOrders
+        customerOrderId:        docRef.id,
       });
 
-      // ─── NEW: patch the payments doc with the purchaseOrderId now that we have it
       const paymentsSnap = await db
         .collection('payments')
         .where('customerOrderId', '==', docRef.id)
@@ -97,11 +112,17 @@ export class OrdersService {
         await paymentsSnap.docs[0].ref.update({ purchaseOrderId: poRef.id });
       }
 
+      if (user?.uid) {
+        await this.loyaltyService.addPurchase(user.uid, body.totalAmount, docRef.id);
+      }
+
       return { success: true, id: docRef.id };
 
     } catch (error) {
+      // ─── Log the REAL error to the terminal ──────────────────────────────
+      console.error('❌ createOrder FAILED:', error);
       throw new HttpException(
-        'Failed to create order',
+        { message: 'Failed to create order', detail: error?.message || error },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -121,7 +142,6 @@ export class OrdersService {
       } else if (email) {
         ref = ref.where('email', '==', email);
       } else {
-        // No user identifier supplied; do not return any orders.
         return [];
       }
 
@@ -138,6 +158,7 @@ export class OrdersService {
         };
       });
     } catch (error) {
+      console.error('❌ getOrders FAILED:', error);
       throw new HttpException(
         'Failed to fetch orders',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -158,6 +179,7 @@ export class OrdersService {
         ...doc.data(),
       }));
     } catch (error) {
+      console.error('❌ getDeliveredOrders FAILED:', error);
       throw new HttpException(
         'Failed to fetch delivered orders',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -176,6 +198,7 @@ export class OrdersService {
       if (snapshot.empty) return { productCode: null };
       return { productCode: snapshot.docs[0].data().productCode ?? null };
     } catch (error) {
+      console.error('❌ getProductCodeByName FAILED:', error);
       throw new HttpException(
         'Failed to fetch product code',
         HttpStatus.INTERNAL_SERVER_ERROR,
@@ -188,23 +211,16 @@ export class OrdersService {
     return { received: true };
   }
 
-  // ─── NEW: settlePayment ────────────────────────────────────────────────────
-  // Called by pharmacist when they confirm payment has been collected/settled.
-  // Updates all three linked collections atomically:
-  //   1. CustomerOrders  → paymentStatus: 'paid'
-  //   2. payments        → status: 'PAID'
-  //   3. purchaseOrders  → status: 'COMPLETED', deliveredAt: now
+  // ─── UNCHANGED: settlePayment ─────────────────────────────────────────────
   async settlePayment(customerOrderId: string) {
     try {
       const db = this.firebaseService.getDb();
 
-      // 1. Update CustomerOrders document
       await db.collection('CustomerOrders').doc(customerOrderId).update({
         paymentStatus:     'paid',
         paymentSettledAt:  FieldValue.serverTimestamp(),
       });
 
-      // 2. Find and update the linked payments document
       const paymentsSnap = await db
         .collection('payments')
         .where('customerOrderId', '==', customerOrderId)
@@ -215,7 +231,6 @@ export class OrdersService {
       );
       await Promise.all(paymentUpdates);
 
-      // 3. Find and update the linked purchaseOrders document
       const poSnap = await db
         .collection('purchaseOrders')
         .where('customerOrderId', '==', customerOrderId)
@@ -232,6 +247,7 @@ export class OrdersService {
       return { success: true };
 
     } catch (error) {
+      console.error('❌ settlePayment FAILED:', error);
       throw new HttpException(
         'Failed to settle payment',
         HttpStatus.INTERNAL_SERVER_ERROR,
