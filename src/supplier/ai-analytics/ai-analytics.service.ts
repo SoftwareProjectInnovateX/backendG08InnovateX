@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { AnalyseInvoicesDto, InvoiceRecord } from './dto/ai-analytics.dto.js';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import PDFDocument from 'pdfkit';
+import { AnalyseInvoicesDto, InvoiceRecord, GenerateSummaryPdfDto } from './dto/ai-analytics.dto.js';
 
 function groupBy<T>(arr: T[], key: (item: T) => string): Record<string, T[]> {
   return arr.reduce((acc, item) => {
@@ -12,6 +13,19 @@ function groupBy<T>(arr: T[], key: (item: T) => string): Record<string, T[]> {
 function daysBetween(iso1: string, iso2: string): number {
   return Math.round((new Date(iso2).getTime() - new Date(iso1).getTime()) / 86_400_000);
 }
+
+/* ── PDF layout constants (used only by generateSummaryPdf) ── */
+const PAGE_MARGIN = 40;
+const PDF_COLORS = {
+  blue: '#2563eb',
+  slate: '#334155',
+  slateLight: '#64748b',
+  border: '#e2e8f0',
+  headerBg: '#f8fafc',
+  red: '#dc2626',
+  amber: '#d97706',
+  emerald: '#059669',
+};
 
 @Injectable()
 export class AiAnalyticsService {
@@ -214,5 +228,363 @@ export class AiAnalyticsService {
     });
 
     return { suggestions };
+  }
+
+  /* ── Added: POST /ai/generate-summary-pdf ── */
+  // Backs downloadSummaryPDF() in AIAnalytics.jsx
+  // Builds the PDF programmatically with PDFKit (different generator than the
+  // puppeteer-based invoice PDF route, as requested)
+  async generateSummaryPdf(dto: GenerateSummaryPdfDto): Promise<Buffer> {
+    try {
+      return await this.buildSummaryPdf(dto);
+    } catch (error) {
+      console.error('Summary PDF generation failed:', error);
+      throw new InternalServerErrorException('Failed to generate summary PDF');
+    }
+  }
+
+  private buildSummaryPdf(dto: GenerateSummaryPdfDto): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: PAGE_MARGIN, bufferPages: true });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      this.pdfHeader(doc, dto);
+      this.pdfOverview(doc, dto);
+      this.pdfSupplySection(doc, dto.supplyRecommendations);
+      this.pdfDemandSection(doc, dto.demandForecast);
+      this.pdfRiskSection(doc, dto.paymentRisk);
+      this.pdfRestockSection(doc, dto.restockSuggestions);
+      this.pdfFooterOnAllPages(doc);
+
+      doc.end();
+    });
+  }
+
+  private pdfHeader(doc: PDFKit.PDFDocument, dto: GenerateSummaryPdfDto) {
+    doc
+      .fillColor(PDF_COLORS.blue)
+      .fontSize(22)
+      .font('Helvetica-Bold')
+      .text('AI Analytics Summary', PAGE_MARGIN, PAGE_MARGIN);
+
+    doc
+      .fillColor(PDF_COLORS.slateLight)
+      .fontSize(10)
+      .font('Helvetica')
+      .text(
+        `Generated ${new Date(dto.generatedAt).toLocaleString()} · Supplier ID: ${dto.supplierId}`,
+        PAGE_MARGIN,
+        doc.y + 2,
+      );
+
+    doc.moveDown(0.5);
+    this.pdfHr(doc, PDF_COLORS.slate, 1);
+    doc.moveDown(0.5);
+  }
+
+  private pdfOverview(doc: PDFKit.PDFDocument, dto: GenerateSummaryPdfDto) {
+    const urgent   = dto.supplyRecommendations.filter((r) => r.urgency === 'urgent').length;
+    const highRisk = dto.paymentRisk.filter((r) => r.riskLevel === 'High').length;
+    const restock  = dto.restockSuggestions.filter((r) => r.restock).length;
+
+    const stats = [
+      { label: 'Invoices Analysed', value: String(dto.invoiceCount) },
+      { label: 'Urgent Supply Items', value: String(urgent) },
+      { label: 'High Payment Risk', value: String(highRisk) },
+      { label: 'Restock Needed', value: String(restock) },
+    ];
+
+    const usableWidth = doc.page.width - PAGE_MARGIN * 2;
+    const boxWidth = usableWidth / 4 - 8;
+    const boxHeight = 50;
+    const startY = doc.y;
+
+    stats.forEach((s, i) => {
+      const x = PAGE_MARGIN + i * (boxWidth + 10.6);
+      doc.rect(x, startY, boxWidth, boxHeight).fillAndStroke(PDF_COLORS.headerBg, PDF_COLORS.border);
+      doc
+        .fillColor(PDF_COLORS.slateLight)
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .text(s.label.toUpperCase(), x + 8, startY + 8, { width: boxWidth - 16 });
+      doc
+        .fillColor(PDF_COLORS.slate)
+        .fontSize(18)
+        .font('Helvetica-Bold')
+        .text(s.value, x + 8, startY + 22, { width: boxWidth - 16 });
+    });
+
+    doc.y = startY + boxHeight + 20;
+  }
+
+  private pdfSupplySection(doc: PDFKit.PDFDocument, items: GenerateSummaryPdfDto['supplyRecommendations']) {
+    this.pdfSectionTitle(doc, 'Supply Recommendations');
+
+    if (!items.length) {
+      this.pdfEmptyState(doc, 'No supply recommendations generated.');
+      return;
+    }
+
+    const urgencyColor: Record<string, string> = {
+      urgent: PDF_COLORS.red,
+      supply: PDF_COLORS.blue,
+      monitor: PDF_COLORS.amber,
+      none: PDF_COLORS.slateLight,
+    };
+
+    items.forEach((rec) => {
+      this.pdfEnsureSpace(doc, 70);
+      const startY = doc.y;
+
+      doc
+        .fillColor(PDF_COLORS.slate)
+        .fontSize(11)
+        .font('Helvetica-Bold')
+        .text(rec.productName, PAGE_MARGIN, startY, { continued: true });
+
+      doc
+        .fillColor(urgencyColor[rec.urgency] || PDF_COLORS.slateLight)
+        .fontSize(9)
+        .font('Helvetica-Bold')
+        .text(`   [${rec.urgency.toUpperCase()}]`, { continued: false });
+
+      doc
+        .fillColor(PDF_COLORS.slateLight)
+        .fontSize(9.5)
+        .font('Helvetica')
+        .text(rec.reason, PAGE_MARGIN, doc.y + 2, { width: 500 });
+
+      doc
+        .fillColor(PDF_COLORS.slate)
+        .fontSize(9)
+        .font('Helvetica')
+        .text(
+          `Invoices: ${rec.invoiceCount}   ·   Total Value: Rs. ${rec.totalValue.toFixed(2)}   ·   Avg Order: Rs. ${rec.avgOrderValue.toFixed(2)}   ·   Paid Rate: ${rec.paymentRate}%   ·   Confidence: ${rec.confidence}%`,
+          PAGE_MARGIN,
+          doc.y + 4,
+          { width: 500 },
+        );
+
+      doc.moveDown(0.8);
+      this.pdfHr(doc, PDF_COLORS.border, 0.5);
+      doc.moveDown(0.5);
+    });
+  }
+
+  private pdfDemandSection(doc: PDFKit.PDFDocument, items: GenerateSummaryPdfDto['demandForecast']) {
+    this.pdfSectionTitle(doc, 'Demand Forecast');
+
+    if (!items.length) {
+      this.pdfEmptyState(doc, 'Not enough data to generate demand forecasts.');
+      return;
+    }
+
+    const cols = [
+      { label: 'Product', width: 130 },
+      { label: 'Avg/Mo', width: 55 },
+      { label: 'Trend', width: 60 },
+      { label: 'Predicted', width: 90 },
+      { label: 'Growth', width: 60 },
+      { label: 'Confidence', width: 75 },
+    ];
+
+    this.pdfTableHeader(doc, cols);
+
+    items.forEach((item) => {
+      this.pdfEnsureSpace(doc, 22);
+      const y = doc.y;
+      const trendLabel = item.trend === 'up' ? 'Up' : item.trend === 'down' ? 'Down' : 'Stable';
+      const row = [
+        item.productName,
+        String(item.avgMonthlyOrders),
+        trendLabel,
+        `Rs. ${item.predictedValue.toFixed(2)}`,
+        `${item.growthRate >= 0 ? '+' : ''}${item.growthRate}%`,
+        `${item.confidence}%`,
+      ];
+      this.pdfTableRow(doc, cols, row, y);
+    });
+
+    doc.moveDown(1);
+  }
+
+  private pdfRiskSection(doc: PDFKit.PDFDocument, items: GenerateSummaryPdfDto['paymentRisk']) {
+    this.pdfSectionTitle(doc, 'Payment Risk Analysis');
+
+    if (!items.length) {
+      this.pdfEmptyState(doc, 'No unpaid invoices to assess for payment risk.');
+      return;
+    }
+
+    const riskFg: Record<string, string> = {
+      High: PDF_COLORS.red,
+      Medium: PDF_COLORS.amber,
+      Low: PDF_COLORS.emerald,
+    };
+
+    items.forEach((risk) => {
+      this.pdfEnsureSpace(doc, 60);
+      const startY = doc.y;
+
+      doc
+        .fillColor(PDF_COLORS.slate)
+        .fontSize(10.5)
+        .font('Helvetica-Bold')
+        .text(`${risk.invoiceNumber}  ·  ${risk.productName}`, PAGE_MARGIN, startY, { continued: true });
+
+      doc
+        .fillColor(riskFg[risk.riskLevel] || PDF_COLORS.slateLight)
+        .fontSize(9)
+        .text(`   [${risk.riskLevel.toUpperCase()} RISK]`);
+
+      doc
+        .fillColor(PDF_COLORS.slateLight)
+        .fontSize(9.5)
+        .font('Helvetica')
+        .text(risk.reason, PAGE_MARGIN, doc.y + 2, { width: 500 });
+
+      doc
+        .fillColor(PDF_COLORS.slate)
+        .fontSize(9)
+        .text(
+          `Amount: Rs. ${risk.amount.toFixed(2)}   ·   Due: ${risk.dueDate}   ·   Overdue: ${risk.daysOverdue ? risk.daysOverdue + 'd' : 'N/A'}   ·   Risk Score: ${risk.riskScore}%`,
+          PAGE_MARGIN,
+          doc.y + 4,
+          { width: 500 },
+        );
+
+      doc.moveDown(0.8);
+      this.pdfHr(doc, PDF_COLORS.border, 0.5);
+      doc.moveDown(0.5);
+    });
+  }
+
+  private pdfRestockSection(doc: PDFKit.PDFDocument, items: GenerateSummaryPdfDto['restockSuggestions']) {
+    this.pdfSectionTitle(doc, 'Restock Suggestions');
+
+    if (!items.length) {
+      this.pdfEmptyState(doc, 'Not enough data to generate restock suggestions.');
+      return;
+    }
+
+    const cols = [
+      { label: 'Product', width: 110 },
+      { label: 'Orders', width: 50 },
+      { label: 'Avg Value', width: 75 },
+      { label: 'Restock?', width: 60 },
+      { label: 'Suggested', width: 80 },
+      { label: 'Confidence', width: 75 },
+    ];
+
+    this.pdfTableHeader(doc, cols);
+
+    items.forEach((item) => {
+      this.pdfEnsureSpace(doc, 22);
+      const y = doc.y;
+      const row = [
+        item.productName,
+        String(item.recentOrders),
+        `Rs. ${item.avgInvoiceValue.toFixed(2)}`,
+        item.restock ? 'Yes' : 'No',
+        item.restock && item.suggestedOrderValue ? `Rs. ${item.suggestedOrderValue.toFixed(2)}` : '-',
+        `${item.confidence}%`,
+      ];
+      this.pdfTableRow(doc, cols, row, y);
+    });
+
+    doc.moveDown(1);
+  }
+
+  private pdfSectionTitle(doc: PDFKit.PDFDocument, title: string) {
+    this.pdfEnsureSpace(doc, 40);
+    doc.fillColor(PDF_COLORS.blue).fontSize(14).font('Helvetica-Bold').text(title, PAGE_MARGIN, doc.y);
+    doc.moveDown(0.4);
+    this.pdfHr(doc, PDF_COLORS.slate, 1);
+    doc.moveDown(0.5);
+  }
+
+  private pdfEmptyState(doc: PDFKit.PDFDocument, message: string) {
+    doc.fillColor(PDF_COLORS.slateLight).fontSize(9.5).font('Helvetica-Oblique').text(message, PAGE_MARGIN, doc.y);
+    doc.moveDown(1);
+  }
+
+  private pdfTableHeader(doc: PDFKit.PDFDocument, cols: { label: string; width: number }[]) {
+    this.pdfEnsureSpace(doc, 24);
+    const y = doc.y;
+    let x = PAGE_MARGIN;
+    const totalWidth = cols.reduce((s, c) => s + c.width, 0);
+
+    doc.rect(PAGE_MARGIN, y, totalWidth, 20).fill(PDF_COLORS.headerBg);
+
+    cols.forEach((c) => {
+      doc
+        .fillColor(PDF_COLORS.slateLight)
+        .fontSize(8)
+        .font('Helvetica-Bold')
+        .text(c.label.toUpperCase(), x + 5, y + 6, { width: c.width - 8 });
+      x += c.width;
+    });
+
+    doc.y = y + 20;
+  }
+
+  private pdfTableRow(doc: PDFKit.PDFDocument, cols: { width: number }[], values: string[], y: number) {
+    let x = PAGE_MARGIN;
+    const totalWidth = cols.reduce((s, c) => s + c.width, 0);
+
+    doc
+      .moveTo(PAGE_MARGIN, y + 18)
+      .lineTo(PAGE_MARGIN + totalWidth, y + 18)
+      .strokeColor(PDF_COLORS.border)
+      .lineWidth(0.5)
+      .stroke();
+
+    cols.forEach((c, i) => {
+      doc
+        .fillColor(PDF_COLORS.slate)
+        .fontSize(8.5)
+        .font('Helvetica')
+        .text(values[i], x + 5, y + 4, { width: c.width - 8 });
+      x += c.width;
+    });
+
+    doc.y = y + 18;
+  }
+
+  private pdfHr(doc: PDFKit.PDFDocument, color: string, width: number) {
+    doc
+      .moveTo(PAGE_MARGIN, doc.y)
+      .lineTo(doc.page.width - PAGE_MARGIN, doc.y)
+      .strokeColor(color)
+      .lineWidth(width)
+      .stroke();
+  }
+
+  private pdfEnsureSpace(doc: PDFKit.PDFDocument, needed: number) {
+    const bottomLimit = doc.page.height - PAGE_MARGIN - 30;
+    if (doc.y + needed > bottomLimit) {
+      doc.addPage();
+    }
+  }
+
+  private pdfFooterOnAllPages(doc: PDFKit.PDFDocument) {
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      doc
+        .fillColor(PDF_COLORS.slateLight)
+        .fontSize(8)
+        .font('Helvetica')
+        .text(
+          `Page ${i + 1} of ${range.count}   ·   AI predictions are decision-support suggestions, not guaranteed outcomes.`,
+          PAGE_MARGIN,
+          doc.page.height - PAGE_MARGIN,
+          { width: doc.page.width - PAGE_MARGIN * 2, align: 'center' },
+        );
+    }
   }
 }
