@@ -42,17 +42,19 @@ export class FirebaseAuthGuard implements CanActivate {
       let role = decodedToken.role; // Check claims first if any
       
       if (!role) {
-        // Try 'admins' collection
-        const adminDoc = await db.collection('admins').doc(uid).get();
-        if (adminDoc.exists) {
-          role = adminDoc.data()?.role || 'admin';
-          console.log(`[FirebaseAuthGuard] Found in 'admins' collection. Role: ${role}`);
-        } else {
-          // Try 'users' collection (customers)
-          const userDoc = await db.collection('users').doc(uid).get();
+        // Try 'user' collection
+        const userDoc = await db.collection('users').doc(uid).get();
           if (userDoc.exists) {
             role = userDoc.data()?.role || 'user';
             console.log(`[FirebaseAuthGuard] Found in 'users' collection. Role: ${role}`);
+        
+        } else {
+          // Try 'admin' collection (customers)
+          
+            const adminDoc = await db.collection('admins').doc(uid).get();
+        if (adminDoc.exists) {
+          role = adminDoc.data()?.role || 'admin';
+          console.log(`[FirebaseAuthGuard] Found in 'admins' collection. Role: ${role}`);
           } else {
             // Try 'suppliers'
             const supplierDoc = await db.collection('suppliers').doc(uid).get();
@@ -73,6 +75,18 @@ export class FirebaseAuthGuard implements CanActivate {
 
       if (!role) {
         console.warn(`[FirebaseAuthGuard] No role found for UID: ${uid}`);
+      }
+      // Fetch status to block suspended users/suppliers
+      let isActive = true;
+      if (role === 'customer') {
+        const userDoc = await db.collection('users').doc(uid).get();
+        isActive = userDoc.data()?.status === 'active';
+      } else if (role === 'supplier') {
+        const supplierDoc = await db.collection('suppliers').doc(uid).get();
+        isActive = supplierDoc.data()?.status === 'active';
+      }
+      if (!isActive) {
+        throw new UnauthorizedException('Your account is suspended or pending approval.');
       }
 
       request.user = {
