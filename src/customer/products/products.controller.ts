@@ -1,5 +1,6 @@
-import { Controller, Get, Put, Param, Body, Query, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Put, Param, Body, Query, BadRequestException, UseGuards } from '@nestjs/common';
 import { ProductsService } from './products.service';
+import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
 
 @Controller('products')
 export class ProductsController {
@@ -11,6 +12,7 @@ export class ProductsController {
     return this.productsService.getProducts(category);
   }
    //reduce stock by 1 when added to cart
+  @UseGuards(FirebaseAuthGuard)
   @Put(':productCode/decrement-stock')
   async decrementStock(
     @Param('productCode') productCode: string,
@@ -25,6 +27,7 @@ export class ProductsController {
     return this.productsService.decrementStock(productCode, body.quantity);
   }
 
+  @UseGuards(FirebaseAuthGuard)
   @Put(':productCode/increment-stock')
   async incrementStock(
     @Param('productCode') productCode: string,
