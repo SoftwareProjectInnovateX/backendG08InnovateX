@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service.js';
+import { LoyaltyService } from '../../customer/loyalty/loyalty.service.js';
 
 @Injectable()
 export class PharmacistDispensedService {
   private readonly collectionName = 'pharmacistDispensed';
 
-  constructor(private readonly firebaseService: FirebaseService) {}
+  constructor(
+    private readonly firebaseService: FirebaseService,
+    private readonly loyaltyService: LoyaltyService,
+  ) {}
 
   async getDispensedHistory() {
     const db = this.firebaseService.getDb();
@@ -15,6 +19,8 @@ export class PharmacistDispensedService {
 
   async addDispensedRecord(dispenseData: any) {
     const db = this.firebaseService.getDb();
+    // Ensure a patientEmail field exists (may be populated by controller via auth)
+    if (!dispenseData.createdAt) dispenseData.createdAt = new Date().toISOString();
     const docRef = await db.collection(this.collectionName).add(dispenseData);
     return { id: docRef.id, ...dispenseData };
   }
@@ -29,7 +35,7 @@ export class PharmacistDispensedService {
     // If this is a payment settlement, also update the payments collection
     if (updateData.paymentStatus === 'paid') {
       try {
-        const dispensedDoc = await docRef.get();
+          const dispensedDoc = await docRef.get();
         const dispensedData = dispensedDoc.data();
 
         // rxId is the link to payments.purchaseOrderId
@@ -53,6 +59,27 @@ export class PharmacistDispensedService {
         } else {
           console.warn('No rxId found in dispensed document:', id);
         }
+          // If payment settled, try to credit loyalty points
+          try {
+            const patientEmail = dispensedData?.patientEmail || updateData?.patientEmail;
+            const amount = Number(dispensedData?.total || updateData?.total || 0);
+            if (patientEmail && amount > 0) {
+              // resolve uid from users collection
+              const userSnap = await db.collection('users').where('email', '==', patientEmail).limit(1).get();
+              if (!userSnap.empty) {
+                const userDoc = userSnap.docs[0];
+                const uid = userDoc.id;
+                // Use rxId as orderId when available
+                const orderId = dispensedData?.rxId || id;
+                await this.loyaltyService.addPurchase(uid, amount, orderId);
+                console.log(`Credited loyalty for uid=${uid} from dispensed id=${id}`);
+              } else {
+                console.warn('Could not find user for patientEmail when crediting loyalty:', patientEmail);
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to credit loyalty on dispensed payment:', err?.message || err);
+          }
       } catch (err) {
         console.warn('Could not sync payment status to payments collection:', err.message);
       }
