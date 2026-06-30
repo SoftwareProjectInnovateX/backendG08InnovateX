@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { FirebaseModule } from '../shared/firebase/firebase.module.js';
 import { CountersModule } from '../shared/counters/counters.module.js';
+import { LoyaltyModule } from '../customer/loyalty/loyalty.module.js';
 
 import { PharmacistProfileService } from './services/pharmacist-profile.service.js';
 import { PharmacistProfileController } from './controllers/pharmacist-profile.controller.js';
@@ -24,7 +25,7 @@ import { PharmacistReturnsService } from './services/pharmacist-returns.service.
 import { PharmacistReturnsController } from './controllers/pharmacist-returns.controller.js';
 
 @Module({
-  imports: [FirebaseModule, CountersModule],
+  imports: [FirebaseModule, CountersModule, LoyaltyModule],
   controllers: [
     PharmacistProfileController,
     PharmacistInventoryController,
