@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
 
 interface OrderType {
   id?: string;
