@@ -146,21 +146,16 @@ export class LoyaltyService {
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     const uid = orders.find((o) => o.userId && !o.userId.includes('@'))?.userId || null;
-    const userLookup = await db.collection('users').where('email', '==', email).limit(1).get();
-    const resolvedUid = userLookup.empty ? uid : userLookup.docs[0].id;
-
-    if (!resolvedUid) {
+    if (!uid) {
       console.warn(`No valid userId found for email ${email} — cannot sync`);
       return null;
     }
-
-    const finalUid = resolvedUid;
 
     const name = orders.find((o) => o.customerName)?.customerName || '';
     const phone = orders.find((o) => o.phone)?.phone || '';
     const level = this.calculateLevel(totalPoints);
 
-    if (finalUid !== email) {
+    if (uid !== email) {
       const emailDocRef = db.collection('loyaltyCustomers').doc(email);
       const emailDoc = await emailDocRef.get();
       if (emailDoc.exists) {
@@ -169,8 +164,8 @@ export class LoyaltyService {
       }
     }
 
-    await db.collection('loyaltyCustomers').doc(finalUid).set({
-      uid: finalUid,
+    await db.collection('loyaltyCustomers').doc(uid).set({
+      uid,
       email,
       name,
       phone,
@@ -189,8 +184,8 @@ export class LoyaltyService {
     }, { merge: true });
 
     return {
-      id: finalUid,
-      uid: finalUid,
+      id: uid,
+      uid,
       email,
       name,
       phone,
@@ -274,50 +269,12 @@ export class LoyaltyService {
     return 'Silver';
   }
 
-  private async getUserEmailForUid(uid: string): Promise<string | null> {
-    const db = this.getDb();
-    const userDoc = await db.collection('users').doc(uid).get();
-    const email = userDoc.exists ? userDoc.data()?.email : null;
-    return typeof email === 'string' && email.trim() ? email.trim().toLowerCase() : null;
-  }
-
-  private async resolveUidFromOrder(order: any, db: any): Promise<string | null> {
-    const rawUid = order?.userId;
-    if (typeof rawUid === 'string' && rawUid.trim() && !rawUid.includes('@')) {
-      return rawUid;
-    }
-
-    const email = typeof order?.email === 'string' ? order.email.trim().toLowerCase() : '';
-    if (!email) {
-      return null;
-    }
-
-    const usersSnap = await db.collection('users').where('email', '==', email).limit(1).get();
-    if (!usersSnap.empty) {
-      return usersSnap.docs[0].id;
-    }
-
-    return null;
-  }
-
   private async buildProfileFromOrders(uid: string): Promise<LoyaltyCustomer | null> {
     const db = this.getDb();
-    const userEmail = await this.getUserEmailForUid(uid);
-
-    let ordersSnapshot = null as any;
-    if (userEmail) {
-      ordersSnapshot = await db
-        .collection('CustomerOrders')
-        .where('email', '==', userEmail)
-        .get();
-    }
-
-    if (!ordersSnapshot || ordersSnapshot.empty) {
-      ordersSnapshot = await db
-        .collection('CustomerOrders')
-        .where('userId', '==', uid)
-        .get();
-    }
+    const ordersSnapshot = await db
+      .collection('CustomerOrders')
+      .where('userId', '==', uid)
+      .get();
 
     if (ordersSnapshot.empty) return null;
 
@@ -362,10 +319,11 @@ export class LoyaltyService {
       phone: string;
     }>();
 
-    for (const doc of snapshot.docs) {
+    snapshot.docs.forEach((doc) => {
       const data = doc.data();
-      const uid = await this.resolveUidFromOrder(data, db);
-      if (!uid) continue;
+      const uid = data.userId;
+      // FIX: Only use userId — never fall back to email as key
+      if (!uid || uid.includes('@')) return;
 
       const existing = orderMap.get(uid) || {
         totalSpent: 0,
@@ -386,7 +344,7 @@ export class LoyaltyService {
       existing.phone = existing.phone || data.phone || '';
 
       orderMap.set(uid, existing);
-    }
+    });
 
     return orderMap;
   }
@@ -543,9 +501,9 @@ export class LoyaltyService {
     const ordersByUser: Record<string, any[]> = {};
     for (const orderDoc of ordersSnapshot.docs) {
       const order = orderDoc.data();
-      const uid = await this.resolveUidFromOrder(order, db);
-      if (!uid) {
-        console.warn(`Skipping order ${orderDoc.id} — unable to resolve uid from user email or userId`);
+      const uid = order.userId;
+      if (!uid || uid.includes('@')) {
+        console.warn(`Skipping order ${orderDoc.id} — invalid userId: "${uid}"`);
         continue;
       }
       if (!ordersByUser[uid]) ordersByUser[uid] = [];
