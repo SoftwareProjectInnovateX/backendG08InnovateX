@@ -14,6 +14,22 @@ export class OrdersController {
     return this.ordersService.createOrder(body, req.user);
   }
 
+  // GENERATE PAYHERE HASH
+  @Get('generate-hash')
+  async generateHash(
+    @Query('orderId') orderId: string,
+    @Query('amount') amount: string,
+    @Query('currency') currency: string,
+  ) {
+    return this.ordersService.generateHash(orderId, amount, currency);
+  }
+
+  // CONFIRM PAYMENT (FOR LOCAL DEV)
+  @Post(':id/confirm')
+  async confirmPayment(@Param('id') id: string) {
+    return this.ordersService.confirmPaymentLocally(id);
+  }
+
   // ─── SECURE: only authenticated customers can fetch their own orders
   @UseGuards(FirebaseAuthGuard)
   @Get()
@@ -31,6 +47,12 @@ export class OrdersController {
   @Get('product-code/:name')
   async getProductCode(@Param('name') name: string) {
     return this.ordersService.getProductCodeByName(name);
+  }
+
+  // GET ORDER DETAILS
+  @Get('details/:id')
+  async getOrderDetails(@Param('id') id: string) {
+    return this.ordersService.getOrderDetails(id);
   }
 
   // ─── UNCHANGED ─────────────────────────────────────────────────────────────

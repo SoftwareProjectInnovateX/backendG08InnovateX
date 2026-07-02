@@ -3,14 +3,42 @@ import { FirebaseService } from '../../shared/firebase/firebase.service';
 import { ProductsService } from '../products/products.service';
 import { LoyaltyService } from '../loyalty/loyalty.service';
 import { FieldValue } from 'firebase-admin/firestore';
-
+import { MailService } from '../../shared/mail/mail.service';
+import * as crypto from 'crypto';
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly firebaseService: FirebaseService,
     private readonly productsService: ProductsService,
     private readonly loyaltyService: LoyaltyService,
+    private readonly mailService: MailService,
   ) {}
+
+  async generateHash(orderId: string, amount: string, currency: string) {
+    const merchantId = process.env.PAYHERE_MERCHANT_ID;
+    const secret = process.env.PAYHERE_SECRET;
+
+    if (!merchantId || !secret) {
+      throw new Error("PayHere environment variables missing");
+    }
+
+    // Security Fix: Always use the exact amount from the database, ignore frontend amount
+    const db = this.firebaseService.getDb();
+    const snap = await db.collection('CustomerOrders').where('orderId', '==', orderId).get();
+    
+    if (snap.empty) {
+      throw new Error("Order not found");
+    }
+
+    const orderData = snap.docs[0].data();
+    const actualAmount = Number(orderData.totalAmount).toFixed(2);
+
+    const hashedSecret = crypto.createHash('md5').update(secret).digest('hex').toUpperCase();
+    const hashString = merchantId + orderId + actualAmount + currency + hashedSecret;
+    const hash = crypto.createHash('md5').update(hashString).digest('hex').toUpperCase();
+
+    return { hash, merchantId, actualAmount };
+  }
 
   private async normalizeOrderItems(items: any[]) {
     return Promise.all(
@@ -206,9 +234,149 @@ export class OrdersService {
     }
   }
 
-  // ─── UNCHANGED: handleNotify ───────────────────────────────────────────────
+  // ─── GET ORDER DETAILS ───────────────────────────────────────────────────
+  async getOrderDetails(orderId: string) {
+    const db = this.firebaseService.getDb();
+    const snap = await db.collection('CustomerOrders').where('orderId', '==', orderId).get();
+    if (snap.empty) return null;
+    return { id: snap.docs[0].id, ...snap.docs[0].data() };
+  }
+
+  // ─── PAYHERE WEBHOOK NOTIFY ───────────────────────────────────────────────
   async handleNotify(body: any) {
+    const merchantId = process.env.PAYHERE_MERCHANT_ID;
+    const secret = process.env.PAYHERE_SECRET;
+
+    if (!merchantId || !secret) {
+        console.error("PayHere environment variables missing");
+        return { received: false };
+    }
+
+    const orderId = body.order_id;
+    const payhereAmount = body.payhere_amount;
+    const payhereCurrency = body.payhere_currency;
+    const statusCode = body.status_code;
+    const md5sig = body.md5sig;
+
+    const hashedSecret = crypto.createHash('md5').update(secret).digest('hex').toUpperCase();
+    const hashString = merchantId + orderId + payhereAmount + payhereCurrency + statusCode + hashedSecret;
+    const generatedSig = crypto.createHash('md5').update(hashString).digest('hex').toUpperCase();
+
+    if (generatedSig === md5sig) {
+      const db = this.firebaseService.getDb();
+      const snap = await db.collection('CustomerOrders').where('orderId', '==', orderId).get();
+      
+      if (!snap.empty) {
+        const docId = snap.docs[0].id;
+        const orderData = snap.docs[0].data();
+        let newStatus = 'pending';
+        
+        // Security Check: Verify amount matches the DB amount
+        if (parseFloat(payhereAmount) !== parseFloat(orderData.totalAmount)) {
+          newStatus = 'failed';
+          console.error(`Security Warning: Amount mismatch for order ${orderId}. Expected ${orderData.totalAmount}, got ${payhereAmount}`);
+        } else if (statusCode == 2) {
+          newStatus = 'paid';
+        } else if (statusCode < 0) {
+          newStatus = 'failed';
+        }
+
+        await db.collection('CustomerOrders').doc(docId).update({
+          paymentStatus: newStatus,
+          orderStatus: newStatus === 'paid' ? 'Paid' : newStatus === 'failed' ? 'Failed' : 'Pending',
+        });
+        console.log(`Order ${orderId} updated to ${newStatus} via PayHere Webhook`);
+
+        if (newStatus === 'paid' && orderData.paymentStatus !== 'paid' && orderData.email) {
+          this.mailService.sendInvoiceEmail({
+            to: orderData.email,
+            customerName: orderData.customerName,
+            orderId: orderData.orderId,
+            address: orderData.address,
+            phone: orderData.phone,
+            totalAmount: orderData.totalAmount,
+            items: orderData.types
+          }).catch(err => console.error("Error sending invoice email (webhook):", err));
+        }
+
+        // Handle prescription status and dispensing queue for ONLINE payments
+        if (newStatus === 'paid' && orderData.rxId) {
+          const rxId = orderData.rxId;
+          const rxRef = db.collection('prescriptions').doc(rxId);
+          const rxSnap = await rxRef.get();
+          
+          if (rxSnap.exists) {
+            const rxData = rxSnap.data();
+            const orderItemsForSuccess = rxData?.orderItems || rxData?.medications || [];
+
+            const dispensedRef = db.collection('pharmacistDispensed').where('rxId', '==', rxId);
+            const dispensedSnap = await dispensedRef.get();
+            
+            const dispensePayload = {
+                rxId: rxId,
+                patientName: orderData.customerName,
+                verifiedPatient: orderData.customerName,
+                phone: orderData.phone,
+                address: orderData.address,
+                orderItems: orderItemsForSuccess,
+                total: orderData.totalAmount,
+                paymentStatus: 'Paid',
+                paymentMethod: 'ONLINE',
+                createdAt: new Date().toISOString(),
+                finalized: false
+            };
+
+            if (!dispensedSnap.empty) {
+                await db.collection('pharmacistDispensed').doc(dispensedSnap.docs[0].id).update(dispensePayload);
+            } else {
+                await db.collection('pharmacistDispensed').add(dispensePayload);
+            }
+
+            // Update prescription status
+            await rxRef.update({
+                status: 'Paid',
+                customerConfirmed: true,
+                paymentMethod: 'ONLINE',
+                confirmedAt: FieldValue.serverTimestamp(),
+                customerAddress: orderData.address
+            });
+          }
+        }
+      }
+    } else {
+        console.error("Invalid PayHere MD5 signature");
+    }
+
     return { received: true };
+  }
+
+  // ─── CONFIRM PAYMENT LOCALLY ───────────────────────────────────────────────
+  async confirmPaymentLocally(orderId: string) {
+    const db = this.firebaseService.getDb();
+    const snap = await db.collection('CustomerOrders').where('orderId', '==', orderId).get();
+    if (!snap.empty) {
+      const orderData = snap.docs[0].data();
+      await db.collection('CustomerOrders').doc(snap.docs[0].id).update({
+        paymentStatus: 'paid',
+        orderStatus: 'Paid'
+      });
+
+      // Send invoice email if not already sent
+      if (orderData.paymentStatus !== 'paid' && orderData.email) {
+        this.mailService.sendInvoiceEmail({
+          to: orderData.email,
+          customerName: orderData.customerName,
+          orderId: orderData.orderId,
+          address: orderData.address,
+          phone: orderData.phone,
+          totalAmount: orderData.totalAmount,
+          items: orderData.types
+        }).catch(err => console.error("Error sending invoice email (local):", err));
+      }
+
+      return { success: true };
+    }
+    return { success: false };
   }
 
   // ─── UNCHANGED: settlePayment ─────────────────────────────────────────────
