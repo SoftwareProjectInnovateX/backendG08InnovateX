@@ -8,7 +8,6 @@ interface ChatRequest {
 }
 
 @Controller('admin/chat')
-@UseGuards(FirebaseAuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
