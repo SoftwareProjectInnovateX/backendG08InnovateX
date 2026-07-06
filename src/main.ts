@@ -15,7 +15,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      'https://coruscating-pony-b63b01.netlify.app',
+      'https://medicarexuom.netlify.app',
       /^http:\/\/localhost(:\d+)?$/,
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
