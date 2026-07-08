@@ -41,6 +41,7 @@ import { ProfileModule } from './customer/profile/profile.module.js';
 import { BrandsModule } from './customer/brands/brands.module.js';
 import { ContactModule } from './customer/contact/contact.module.js';
 import { LoyaltyModule } from './customer/loyalty/loyalty.module.js';
+import { BlogModule } from './customer/blog/blog.module.js';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { LoyaltyModule } from './customer/loyalty/loyalty.module.js';
     BrandsModule,
     ContactModule,
     LoyaltyModule,
+    BlogModule,
   ],
   controllers: [AppController],
   providers: [AppService],
