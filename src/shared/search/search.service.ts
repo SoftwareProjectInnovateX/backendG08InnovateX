@@ -168,19 +168,20 @@ export class SearchService implements OnModuleInit {
     );
   }
 
-  private logSearch(query: string, resultsCount: number): void {
-    const db = this.firebaseService.getDb(); // ← changed from getFirestore()
-    db.collection('searchLogs')
-      .add({
+  private async logSearch(query: string, resultsCount: number): Promise<void> {
+    const db = this.firebaseService.getDb();
+    try {
+      await db.collection('searchLogs').add({
         query: query.toLowerCase().trim(),
         resultsCount,
         timestamp: new Date(),
         date: new Date().toISOString().split('T')[0],
-      })
-      .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error('Failed to log search:', msg);
       });
+      console.log(`✅ Logged search: "${query}" (${resultsCount} results)`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('❌ Failed to log search:', msg);
+    }
   }
 
   async search(query: string): Promise<unknown> {
@@ -189,12 +190,13 @@ export class SearchService implements OnModuleInit {
       this.keywordSearch(query),
     ]);
     const mergedResults = this.mergeResults(vectorResults, keywordResults);
-    this.logSearch(query, mergedResults.length);
+    // Await the logSearch to ensure it completes before sending the response
+    await this.logSearch(query, mergedResults.length);
     return { results: mergedResults, total: mergedResults.length, query };
   }
 
   async getSearchAnalytics(): Promise<unknown> {
-    const db = this.firebaseService.getDb(); // ← changed from getFirestore()
+    const db = this.firebaseService.getDb();
     const snapshot = await db
       .collection('searchLogs')
       .orderBy('timestamp', 'desc')
