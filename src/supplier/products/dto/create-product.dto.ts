@@ -9,7 +9,7 @@ import {
 export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
-  productName: string;
+  productName!: string;
 
   @IsString()
   @IsNotEmpty()
@@ -20,10 +20,10 @@ export class CreateProductDto {
     'Medical Equipment',
     'Supplements',
   ])
-  category: string;
+  category!: string;
 
   @IsNumber()
-  wholesalePrice: number;
+  wholesalePrice!: number;
 
   @IsNumber()
   @IsOptional()

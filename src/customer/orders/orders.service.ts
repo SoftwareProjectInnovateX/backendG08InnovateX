@@ -148,7 +148,7 @@ export class OrdersService {
 
     } catch (error) {
       // ─── Log the REAL error to the terminal ──────────────────────────────
-      console.error('❌ createOrder FAILED:', error);
+      console.error('createOrder FAILED:', error);
       throw new HttpException(
         { message: 'Failed to create order', detail: error?.message || error },
         HttpStatus.INTERNAL_SERVER_ERROR,
