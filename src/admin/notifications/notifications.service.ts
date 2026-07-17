@@ -21,6 +21,32 @@ export class NotificationsService {
     return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 
+  // ─── POST create ORDER_SHIPPED notification (supplier marks In Delivery) ───
+  async createOrderShippedNotification(data: {
+    orderId: string;
+    poId: string;
+    supplierName?: string;
+    courier?: string;
+    trackingNumber: string;
+    trackingUrl?: string;
+  }) {
+    await this.db.collection('notifications').add({
+      recipientType: 'admin',
+      type: 'ORDER_SHIPPED',
+      read: false,
+      orderId: data.orderId,
+      poId: data.poId,
+      supplierName: data.supplierName || null,
+      courier: data.courier || null,
+      trackingNumber: data.trackingNumber,
+      trackingUrl: data.trackingUrl || null,
+      message: `Order ${data.poId} has been picked by ${data.courier || 'the courier'}.`,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, message: 'Shipment notification created' };
+  }
+
   // ─── PATCH mark single notification as read ────────────────────
   async markAsRead(notificationId: string) {
     const ref = this.db.collection('notifications').doc(notificationId);
