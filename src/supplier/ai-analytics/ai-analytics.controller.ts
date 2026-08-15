@@ -27,8 +27,6 @@ export class AiAnalyticsController {
     return this.aiAnalyticsService.restockSuggestions(dto);
   }
 
-  // Added: POST /ai/generate-summary-pdf
-  // Backs downloadSummaryPDF() in AIAnalytics.jsx
   @Post('generate-summary-pdf')
   @HttpCode(HttpStatus.OK)
   async generateSummaryPdf(@Body() dto: GenerateSummaryPdfDto, @Res() res: Response) {

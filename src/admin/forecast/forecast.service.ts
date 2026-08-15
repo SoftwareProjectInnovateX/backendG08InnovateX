@@ -143,7 +143,7 @@ export class ForecastService {
 
   private async fetchProducts(): Promise<ProductDoc[]> {
     const db = this.firebaseService.getDb();
-    const snapshot = await db.collection('adminProducts').get();
+    const snapshot = await db.collection('products').get();
 
     return snapshot.docs.map((doc) => {
       const d = doc.data();

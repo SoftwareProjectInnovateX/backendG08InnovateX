@@ -8,13 +8,6 @@ export class ForecastScheduler {
 
   constructor(private readonly forecastService: ForecastService) {}
 
-  /**
-   * Runs every day at 02:00 AM server time.
-   * Writes results to the salesForecasts Firestore collection.
-   *
-   * To test immediately without waiting for 2 AM, temporarily change to:
-   * @Cron(CronExpression.EVERY_MINUTE)
-   */
   @Cron('0 2 * * *')
   async generateDailyForecast() {
     this.logger.log('Starting daily forecast generation…');
