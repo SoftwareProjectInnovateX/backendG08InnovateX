@@ -301,4 +301,84 @@ async sendProductRejectedEmail(data: {
     `,
   });
 }
+
+  async sendInvoiceEmail(data: {
+    to: string;
+    customerName: string;
+    orderId: string;
+    address: string;
+    phone: string;
+    totalAmount: string | number;
+    items?: any[];
+  }): Promise<void> {
+    const itemsHtml = (data.items && data.items.length > 0)
+      ? data.items.map(item => `<li>${item.name || item}</li>`).join('')
+      : '<li>MediCareX Medicine Order</li>';
+
+    await this.mailer.sendMail({
+      to: data.to,
+      subject: `MediCareX Order Payment Confirmation - ${data.orderId}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; background: #f5f9ff; margin: 0; padding: 0; }
+            .wrapper { max-width: 600px; margin: 40px auto; background: #ffffff;
+                       border-radius: 16px; overflow: hidden;
+                       box-shadow: 0 4px 24px rgba(30,64,175,0.10); }
+            .header  { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+                       padding: 36px 40px; text-align: center; }
+            .header h1 { color: #ffffff; margin: 0; font-size: 26px; letter-spacing: 1px; }
+            .header p  { color: #bfdbfe; margin: 6px 0 0; font-size: 14px; }
+            .body    { padding: 36px 40px; }
+            .greeting { font-size: 18px; font-weight: 600; color: #1e3a8a; margin-bottom: 12px; }
+            .message  { color: #475569; font-size: 15px; line-height: 1.7; }
+            .badge   { display: inline-block; background: #dcfce7; color: #16a34a;
+                       font-size: 12px; font-weight: 700; padding: 4px 12px;
+                       border-radius: 99px; letter-spacing: 0.5px; margin-bottom: 16px; }
+            .credentials { background: #f0f7ff; border: 1.5px solid #bfdbfe;
+                           border-radius: 10px; padding: 20px 24px; margin: 24px 0; }
+            .credentials p  { margin: 6px 0; font-size: 14px; color: #334155; }
+            .credentials strong { color: #1e3a8a; }
+            .footer  { background: #f8fafc; padding: 20px 40px; text-align: center;
+                       font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+            ul { margin-top: 5px; margin-bottom: 5px; padding-left: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="wrapper">
+            <div class="header">
+              <h1>MediCareX</h1>
+              <p>Pharmacy Supply Chain Management</p>
+            </div>
+            <div class="body">
+              <span class="badge">Payment Confirmed</span>
+              <p class="greeting">Hello ${data.customerName},</p>
+              <p class="message">
+                Thank you for your order! We have successfully received your payment for order <strong>${data.orderId}</strong>.
+              </p>
+              <div class="credentials">
+                <p><strong>Order Details:</strong></p>
+                <p><strong>Order ID:</strong> ${data.orderId}</p>
+                <p><strong>Total Amount:</strong> LKR ${data.totalAmount}</p>
+                <p><strong>Delivery Address:</strong> ${data.address}</p>
+                <p><strong>Phone:</strong> ${data.phone}</p>
+                <p><strong>Items:</strong></p>
+                <ul>${itemsHtml}</ul>
+              </div>
+              <p class="message">
+                Your order is now being processed by our pharmacists and will be dispatched to your address soon.
+              </p>
+            </div>
+            <div class="footer">
+              ${new Date().getFullYear()} MediCareX · This is an automated message, please do not reply.
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+  }
 }

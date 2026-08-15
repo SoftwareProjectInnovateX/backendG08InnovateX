@@ -4,7 +4,6 @@ import { SyncService } from '../../shared/search/sync.service.js';
 import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
 
 @Controller('admin/search')
-@UseGuards(FirebaseAuthGuard)
 export class AdminSearchController {
   constructor(
     private readonly searchService: SearchService,
@@ -19,11 +18,13 @@ export class AdminSearchController {
     return this.searchService.search(query.trim());
   }
 
+  @UseGuards(FirebaseAuthGuard)
   @Get('sync')
   syncProducts(): Promise<unknown> {
     return this.syncService.syncAllProducts();
   }
 
+  @UseGuards(FirebaseAuthGuard)
   @Get('analytics')
   getAnalytics(): Promise<unknown> {
     return this.searchService.getSearchAnalytics();

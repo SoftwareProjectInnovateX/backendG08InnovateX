@@ -8,6 +8,7 @@ export class ForecastScheduler {
 
   constructor(private readonly forecastService: ForecastService) {}
 
+  
   @Cron('0 2 * * *')
   async generateDailyForecast() {
     this.logger.log('Starting daily forecast generation…');

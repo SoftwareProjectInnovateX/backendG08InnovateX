@@ -21,7 +21,7 @@ export class ProfileService {
       .get();
 
     if (ordersSnap.empty) {
-      return { loyaltyPoints: 0, level: 'Silver', recommendedOffers: [] };
+      return { loyaltyPoints: 0, totalPoints: 0, level: 'Silver', recommendedOffers: [] };
     }
 
     const totalPoints = ordersSnap.docs.reduce((sum: number, doc: any) => {
@@ -29,8 +29,9 @@ export class ProfileService {
     }, 0);
 
     return {
-      loyaltyPoints:     totalPoints,
-      level:             this.calculateLevel(totalPoints),
+      loyaltyPoints: totalPoints,
+      totalPoints,
+      level: this.calculateLevel(totalPoints),
       recommendedOffers: [],
     };
   }
@@ -44,19 +45,15 @@ export class ProfileService {
       db.collection('loyaltyCustomers').doc(uid).get(),
     ]);
 
-    // Determine loyalty data:
-    // 1. Use loyaltyCustomers doc if it exists
-    // 2. Otherwise calculate from CustomerOrders
-    let loyaltyData;
+    // Always calculate from CustomerOrders — never trust the cache.
+    // This matches the pharmacist dashboard's source of truth.
+    const loyaltyData = await this.getLoyaltyFromOrders(uid, db);
+
+    // If loyaltyCustomers doc exists, only use recommendedOffers from it.
+    // AI-generated offers are not stored in CustomerOrders.
     if (loyaltySnap.exists) {
       const l = loyaltySnap.data();
-      loyaltyData = {
-        loyaltyPoints:     l?.totalPoints       ?? 0,
-        level:             l?.level             ?? 'Silver',
-        recommendedOffers: l?.recommendedOffers ?? [],
-      };
-    } else {
-      loyaltyData = await this.getLoyaltyFromOrders(uid, db);
+      loyaltyData.recommendedOffers = l?.recommendedOffers ?? [];
     }
 
     // If users doc exists, merge and return
