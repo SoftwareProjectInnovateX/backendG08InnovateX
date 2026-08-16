@@ -116,8 +116,8 @@ export class SearchService implements OnModuleInit {
         .get();
 
       const results = snapshot.docs.map((doc) => ({
-        id: doc.id,
         ...(doc.data() as Product),
+        id: doc.id,
         similarityScore: 100,
         searchSource: 'keyword',
       }));
