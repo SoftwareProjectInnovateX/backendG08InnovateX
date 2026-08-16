@@ -14,6 +14,23 @@ function daysBetween(iso1: string, iso2: string): number {
   return Math.round((new Date(iso2).getTime() - new Date(iso1).getTime()) / 86_400_000);
 }
 
+interface ProductAnalyticsRecord extends InvoiceRecord {
+  productName: string;
+  totalAmount: number;
+}
+
+function expandInvoiceItems(invoices: InvoiceRecord[]): ProductAnalyticsRecord[] {
+  return invoices.flatMap((inv) => {
+    if (!inv.items?.length) return [{ ...inv }];
+
+    return inv.items.map((item) => ({
+      ...inv,
+      productName: item.productName,
+      totalAmount: Math.max(0, item.quantity) * Math.max(0, item.unitPrice),
+    }));
+  });
+}
+
 /* ── PDF layout constants (used only by generateSummaryPdf) ── */
 const PAGE_MARGIN = 40;
 const PDF_COLORS = {
@@ -31,7 +48,8 @@ const PDF_COLORS = {
 export class AiAnalyticsService {
 
   supplyRecommendations(dto: AnalyseInvoicesDto) {
-    const grouped = groupBy(dto.invoices, (inv) => inv.productName);
+    const productRecords = expandInvoiceItems(dto.invoices);
+    const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const recommendations = Object.entries(grouped).map(([productName, invs]) => {
       const paidInvs    = invs.filter((i) => i.paymentStatus === 'Paid');
@@ -90,10 +108,11 @@ export class AiAnalyticsService {
   }
 
   demandForecast(dto: AnalyseInvoicesDto) {
-    const grouped = groupBy(dto.invoices, (inv) => inv.productName);
+    const productRecords = expandInvoiceItems(dto.invoices);
+    const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const forecasts = Object.entries(grouped)
-      .filter(([, invs]) => invs.length >= 2)
+      .filter(([, invs]) => new Set(invs.map((inv) => inv.invoiceDate.slice(0, 7))).size >= 3)
       .map(([productName, invs]) => {
         const byMonth: Record<string, number> = {};
         invs.forEach((inv) => {
@@ -151,7 +170,9 @@ export class AiAnalyticsService {
     const risks = unpaid.map((inv) => {
       const daysOverdue  = inv.dueDate ? Math.max(0, daysBetween(inv.dueDate, today)) : 0;
       const pharmacyStat = pharmacyStats[inv.pharmacy] ?? { total: 1, late: 0 };
-      const lateRate     = pharmacyStat.late / pharmacyStat.total;
+      const historicalTotal = Math.max(0, pharmacyStat.total - 1);
+      const historicalLate = Math.max(0, pharmacyStat.late - (inv.paymentStatus === 'Overdue' ? 1 : 0));
+      const lateRate = historicalTotal > 0 ? historicalLate / historicalTotal : 0;
 
       let riskScore = 0;
       riskScore += Math.min(40, daysOverdue * 2);
@@ -174,7 +195,7 @@ export class AiAnalyticsService {
         pharmacy:      inv.pharmacy,
         amount:        inv.totalAmount,
         dueDate:       inv.dueDate,
-        daysOverdue:   daysOverdue > 0 ? daysOverdue : null,
+        daysOverdue,
         riskScore, riskLevel,
         reason: reason.trim(),
       };
@@ -185,7 +206,8 @@ export class AiAnalyticsService {
   }
 
   restockSuggestions(dto: AnalyseInvoicesDto) {
-    const grouped = groupBy(dto.invoices, (inv) => inv.productName);
+    const productRecords = expandInvoiceItems(dto.invoices);
+    const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const suggestions = Object.entries(grouped).map(([productName, invs]) => {
       const recentCutoff = new Date();
@@ -451,7 +473,7 @@ export class AiAnalyticsService {
         .fillColor(PDF_COLORS.slate)
         .fontSize(9)
         .text(
-          `Amount: Rs. ${risk.amount.toFixed(2)}   ·   Due: ${risk.dueDate}   ·   Overdue: ${risk.daysOverdue ? risk.daysOverdue + 'd' : 'N/A'}   ·   Risk Score: ${risk.riskScore}%`,
+          `Amount: Rs. ${risk.amount.toFixed(2)}   ·   Due: ${risk.dueDate}   ·   Overdue: ${risk.daysOverdue != null ? risk.daysOverdue + 'd' : 'N/A'}   ·   Risk Score: ${risk.riskScore}%`,
           PAGE_MARGIN,
           doc.y + 4,
           { width: 500 },
