@@ -25,7 +25,7 @@ export class OrdersService {
     // Security Fix: Always use the exact amount from the database, ignore frontend amount
     const db = this.firebaseService.getDb();
     const snap = await db.collection('CustomerOrders').where('orderId', '==', orderId).get();
-    
+
     if (snap.empty) {
       throw new Error("Order not found");
     }
@@ -81,64 +81,8 @@ export class OrdersService {
         createdAt:     FieldValue.serverTimestamp(),
       };
 
+      // ─── ONLY collection updated by order placement: CustomerOrders ────
       const docRef = await db.collection('CustomerOrders').add(orderPayload);
-
-      const poId = `PO-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 7);
-
-      const firstItem = normalizedItems[0] || rawItems[0] || {};
-
-      await db.collection('payments').add({
-        amount:           body.totalAmount,
-        createdAt:        FieldValue.serverTimestamp(),
-        dueDate:          dueDate,
-        orderId:          poId,
-        paymentLabel:     body.paymentMethod === 'ONLINE'
-                            ? 'Full Payment (Online)'
-                            : 'Cash on Delivery',
-        paymentType:      body.paymentMethod === 'ONLINE' ? 'ONLINE' : 'COD',
-        productName:      firstItem?.name || '',
-        purchaseOrderId:  '',
-        quantity:         rawItems.reduce(
-                            (sum: number, i: any) => sum + (i.quantity || 1), 0
-                          ),
-        status:           body.paymentMethod === 'ONLINE' ? 'PAID' : 'PENDING',
-        supplierId:       null,
-        supplierName:     null,
-        totalOrderAmount: body.totalAmount,
-        customerOrderId:  docRef.id,
-        customerId:       user?.uid || body.userId || null,
-      });
-
-      const poRef = await db.collection('purchaseOrders').add({
-        deliveredAt:            null,
-        initialPaymentDate:     FieldValue.serverTimestamp(),
-        initialPaymentStatus:   body.paymentMethod === 'ONLINE' ? 'PAID' : 'PENDING',
-        orderDate:              FieldValue.serverTimestamp(),
-        pharmacistAcknowledged: false,
-        pharmacy:               body.pharmacy    || '',
-        poId:                   poId,
-        product:                firstItem?.name  || '',
-        productId:              firstItem?.id    || '',
-        quantity:               rawItems.reduce(
-                                  (sum: number, i: any) => sum + (i.quantity || 1), 0
-                                ),
-        reorderLevel:           0,
-        status:                 'PENDING',
-        customerOrderId:        docRef.id,
-      });
-
-      const paymentsSnap = await db
-        .collection('payments')
-        .where('customerOrderId', '==', docRef.id)
-        .limit(1)
-        .get();
-
-      if (!paymentsSnap.empty) {
-        await paymentsSnap.docs[0].ref.update({ purchaseOrderId: poRef.id });
-      }
 
       if (user?.uid) {
         await this.loyaltyService.addPurchase(user.uid, body.totalAmount, docRef.id);
@@ -265,12 +209,12 @@ export class OrdersService {
     if (generatedSig === md5sig) {
       const db = this.firebaseService.getDb();
       const snap = await db.collection('CustomerOrders').where('orderId', '==', orderId).get();
-      
+
       if (!snap.empty) {
         const docId = snap.docs[0].id;
         const orderData = snap.docs[0].data();
         let newStatus = 'pending';
-        
+
         // Security Check: Verify amount matches the DB amount
         if (parseFloat(payhereAmount) !== parseFloat(orderData.totalAmount)) {
           newStatus = 'failed';
@@ -304,14 +248,14 @@ export class OrdersService {
           const rxId = orderData.rxId;
           const rxRef = db.collection('prescriptions').doc(rxId);
           const rxSnap = await rxRef.get();
-          
+
           if (rxSnap.exists) {
             const rxData = rxSnap.data();
             const orderItemsForSuccess = rxData?.orderItems || rxData?.medications || [];
 
             const dispensedRef = db.collection('pharmacistDispensed').where('rxId', '==', rxId);
             const dispensedSnap = await dispensedRef.get();
-            
+
             const dispensePayload = {
                 rxId: rxId,
                 patientName: orderData.customerName,
@@ -379,7 +323,7 @@ export class OrdersService {
     return { success: false };
   }
 
-  // ─── UNCHANGED: settlePayment ─────────────────────────────────────────────
+  // ─── settlePayment: now only updates CustomerOrders ────────────────────────
   async settlePayment(customerOrderId: string) {
     try {
       const db = this.firebaseService.getDb();
@@ -388,29 +332,6 @@ export class OrdersService {
         paymentStatus:     'paid',
         paymentSettledAt:  FieldValue.serverTimestamp(),
       });
-
-      const paymentsSnap = await db
-        .collection('payments')
-        .where('customerOrderId', '==', customerOrderId)
-        .get();
-
-      const paymentUpdates = paymentsSnap.docs.map(doc =>
-        doc.ref.update({ status: 'PAID' })
-      );
-      await Promise.all(paymentUpdates);
-
-      const poSnap = await db
-        .collection('purchaseOrders')
-        .where('customerOrderId', '==', customerOrderId)
-        .get();
-
-      const poUpdates = poSnap.docs.map(doc =>
-        doc.ref.update({
-          status:      'COMPLETED',
-          deliveredAt: FieldValue.serverTimestamp(),
-        })
-      );
-      await Promise.all(poUpdates);
 
       return { success: true };
 
