@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { AnalyseInvoicesDto, InvoiceRecord, GenerateSummaryPdfDto } from './dto/ai-analytics.dto.js';
+import { AnalyseInvoicesDto, InvoiceRecord, GenerateSummaryPdfDto, GenerateBusinessAdvisorDto } from './dto/ai-analytics.dto.js';
 
 function groupBy<T>(arr: T[], key: (item: T) => string): Record<string, T[]> {
   return arr.reduce((acc, item) => {
@@ -32,6 +32,9 @@ function expandInvoiceItems(invoices: InvoiceRecord[]): ProductAnalyticsRecord[]
 }
 
 /* ── PDF layout constants (used only by generateSummaryPdf) ── */
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+
 const PAGE_MARGIN = 40;
 const PDF_COLORS = {
   blue: '#2563eb',
@@ -250,6 +253,113 @@ export class AiAnalyticsService {
     });
 
     return { suggestions };
+  }
+
+  /* ── Groq AI Business Advisor ── */
+  async businessAdvisor(dto: GenerateBusinessAdvisorDto) {
+    const apiKey = process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+      throw new InternalServerErrorException(
+        'GROQ_API_KEY is not configured on the backend.',
+      );
+    }
+
+    const analyticsPayload = {
+      invoiceCount: dto.invoiceCount,
+      supplyRecommendations: dto.supplyRecommendations,
+      demandForecast: dto.demandForecast,
+      paymentRisk: dto.paymentRisk,
+      restockSuggestions: dto.restockSuggestions,
+    };
+
+    const systemPrompt = `You are the MediCareX Supplier Business Advisor.
+You receive already-calculated supplier analytics from deterministic statistical and rule-based algorithms.
+Your job is ONLY to interpret those results and turn them into short, practical business advice.
+Do not recalculate or change any numeric value. Do not invent products, invoices, risks, trends, or figures.
+Keep the advice suitable for a pharmacy supplier dashboard.
+Return ONLY valid JSON with exactly this structure:
+{
+  "summary": "2-4 sentence overall summary",
+  "priorityActions": ["action 1", "action 2", "action 3"],
+  "watchItems": ["watch item 1", "watch item 2"]
+}
+Use a maximum of 3 priority actions and 2 watch items. If there is nothing important, use an empty array.`;
+
+    try {
+      const response = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          temperature: 0.2,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: `Supplier analytics:\n${JSON.stringify(analyticsPayload)}`,
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Groq API error:', response.status, errorText);
+        throw new Error(`Groq API returned HTTP ${response.status}`);
+      }
+
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+
+      const rawContent = data.choices?.[0]?.message?.content?.trim();
+      if (!rawContent) {
+        throw new Error('Groq returned an empty response.');
+      }
+
+      const cleaned = rawContent
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```$/i, '')
+        .trim();
+
+      let parsed: {
+        summary?: string;
+        priorityActions?: string[];
+        watchItems?: string[];
+      };
+
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        parsed = {
+          summary: cleaned,
+          priorityActions: [],
+          watchItems: [],
+        };
+      }
+
+      return {
+        provider: 'Groq',
+        model: GROQ_MODEL,
+        summary: parsed.summary || 'No AI summary was generated.',
+        priorityActions: Array.isArray(parsed.priorityActions)
+          ? parsed.priorityActions.slice(0, 3)
+          : [],
+        watchItems: Array.isArray(parsed.watchItems)
+          ? parsed.watchItems.slice(0, 2)
+          : [],
+      };
+    } catch (error) {
+      console.error('Groq business advisor failed:', error);
+      throw new InternalServerErrorException(
+        'Failed to generate Groq business advice.',
+      );
+    }
   }
 
   /* ── Added: POST /ai/generate-summary-pdf ── */
