@@ -34,9 +34,7 @@ export class SearchService implements OnModuleInit {
   private pinecone!: Pinecone;
   private index!: Index<RecordMetadata>;
   private embedder: any = null;
-  private productCache: any[] = [];
-  private cacheTime: number = 0;
-  private readonly CACHE_DURATION = 5 * 60 * 1000;
+
 
   constructor(private firebaseService: FirebaseService) {}
 
@@ -108,44 +106,25 @@ export class SearchService implements OnModuleInit {
 
   private async keywordSearch(query: string): Promise<Product[]> {
     try {
-      const now = Date.now();
       const db = this.firebaseService.getDb();
+      
+      // Prefix search on name (case-sensitive)
+      const snapshot = await db.collection('pharmacistProducts')
+        .where('name', '>=', query)
+        .where('name', '<=', query + '\uf8ff')
+        .limit(20)
+        .get();
 
-      if (
-        this.productCache.length === 0 ||
-        now - this.cacheTime > this.CACHE_DURATION
-      ) {
-        console.log('📦 Fetching products from Firestore...');
-        const snapshot = await db.collection('pharmacistProducts').get();
-        this.productCache = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...(doc.data() as Record<string, unknown>),
-        }));
-        this.cacheTime = now;
-        console.log(`✅ Cached ${this.productCache.length} products`);
-      }
+      const results = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...(doc.data() as Product),
+        similarityScore: 100,
+        searchSource: 'keyword',
+      }));
 
-      const queryLower = query.toLowerCase();
-
-      return this.productCache
-        .filter((product) => {
-          const p = product as Product;
-          return (
-            p.name?.toLowerCase().includes(queryLower) ||
-            p.description?.toLowerCase().includes(queryLower) ||
-            p.category?.toLowerCase().includes(queryLower) ||
-            p.manufacturer?.toLowerCase().includes(queryLower) ||
-            p.availability?.toLowerCase().includes(queryLower)
-          );
-        })
-        .map((product) => ({
-          ...(product as Product),
-          similarityScore: 100,
-          searchSource: 'keyword',
-        }));
+      return results;
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('Keyword search failed:', msg);
+      console.error('Keyword search failed:', error);
       return [];
     }
   }
