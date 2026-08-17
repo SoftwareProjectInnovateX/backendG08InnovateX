@@ -37,24 +37,6 @@ function expandInvoiceItems(
     }));
   });
 }
-
-interface ProductAnalyticsRecord extends InvoiceRecord {
-  productName: string;
-  totalAmount: number;
-}
-
-function expandInvoiceItems(invoices: InvoiceRecord[]): ProductAnalyticsRecord[] {
-  return invoices.flatMap((inv) => {
-    if (!inv.items?.length) return [{ ...inv }];
-
-    return inv.items.map((item) => ({
-      ...inv,
-      productName: item.productName,
-      totalAmount: Math.max(0, item.quantity) * Math.max(0, item.unitPrice),
-    }));
-  });
-}
-
 /* ── PDF layout constants (used only by generateSummaryPdf) ── */
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
@@ -115,6 +97,8 @@ export class AiAnalyticsService {
         urgency = 'none';
         reason  = `Low order frequency or poor payment history. No immediate action needed.`;
       }
+
+      const confidence = Math.min(95, Math.max(30, score + 35));
 
         return {
           productName,
