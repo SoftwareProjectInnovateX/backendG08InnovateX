@@ -37,8 +37,6 @@ function expandInvoiceItems(
     }));
   });
 }
-
-
 /* ── PDF layout constants (used only by generateSummaryPdf) ── */
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
@@ -100,7 +98,7 @@ export class AiAnalyticsService {
         reason  = `Low order frequency or poor payment history. No immediate action needed.`;
       }
 
-      const confidence = Math.max(0, Math.min(100, score));
+      const confidence = Math.min(95, Math.max(30, score + 35));
 
         return {
           productName,

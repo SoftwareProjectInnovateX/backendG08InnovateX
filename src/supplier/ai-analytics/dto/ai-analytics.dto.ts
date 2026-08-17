@@ -90,4 +90,3 @@ export class GenerateBusinessAdvisorDto {
   paymentRisk!: PaymentRiskItem[];
   restockSuggestions!: RestockSuggestion[];
 }
-
