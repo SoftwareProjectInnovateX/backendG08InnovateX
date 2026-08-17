@@ -4,6 +4,6 @@ import { AiAnalyticsService } from './ai-analytics.service.js';
 
 @Module({
   controllers: [AiAnalyticsController],
-  providers:   [AiAnalyticsService],
+  providers: [AiAnalyticsService],
 })
 export class AiAnalyticsModule {}

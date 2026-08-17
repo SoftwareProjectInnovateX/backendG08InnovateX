@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { FirebaseService } from '../../shared/firebase/firebase.service';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -72,7 +76,10 @@ export class NotificationsService {
     snapshot.docs.forEach((d) => batch.update(d.ref, { read: true }));
     await batch.commit();
 
-    return { success: true, message: `${snapshot.size} notifications marked as read` };
+    return {
+      success: true,
+      message: `${snapshot.size} notifications marked as read`,
+    };
   }
 
   // ─── PATCH mark order as received (ORDER_APPROVED action) ─────
@@ -85,21 +92,25 @@ export class NotificationsService {
       throw new NotFoundException('Notification not found');
     }
 
-    const notification = notifSnap.data()!; 
+    const notification = notifSnap.data()!;
 
     // 2. Get purchase order
-    const orderRef = this.db.collection('purchaseOrders').doc(notification.orderId);
+    const orderRef = this.db
+      .collection('purchaseOrders')
+      .doc(notification.orderId);
     const orderSnap = await orderRef.get();
 
     if (!orderSnap.exists) {
       throw new NotFoundException('Order not found');
     }
 
-    const order = orderSnap.data()!; 
+    const order = orderSnap.data()!;
 
     // 3. Validate order status
     if (order.status !== 'APPROVED') {
-      throw new BadRequestException('Order must be APPROVED before marking as received');
+      throw new BadRequestException(
+        'Order must be APPROVED before marking as received',
+      );
     }
 
     // 4. Update purchase order to COMPLETED
@@ -110,7 +121,9 @@ export class NotificationsService {
     });
 
     // 5. Update adminProduct stock
-    const adminProductRef = this.db.collection('adminProducts').doc(order.adminProductId);
+    const adminProductRef = this.db
+      .collection('adminProducts')
+      .doc(order.adminProductId);
     const adminProductSnap = await adminProductRef.get();
 
     if (adminProductSnap.exists) {

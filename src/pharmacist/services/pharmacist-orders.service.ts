@@ -4,22 +4,22 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 @Injectable()
 export class PharmacistOrdersService {
-  private readonly collectionName    = 'CustomerOrders';
+  private readonly collectionName = 'CustomerOrders';
   private readonly returnsCollection = 'CustomerReturns';
 
   constructor(private readonly firebaseService: FirebaseService) {}
 
   async getOnlineOrders() {
-    const db       = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const snapshot = await db
       .collection(this.collectionName)
       .orderBy('createdAt', 'desc')
       .get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
   async addOnlineOrder(orderData: any) {
-    const db     = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const docRef = await db.collection(this.collectionName).add(orderData);
     return { id: docRef.id, ...orderData };
   }
@@ -31,19 +31,22 @@ export class PharmacistOrdersService {
   }
 
   async getReturns() {
-    const db       = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const snapshot = await db
       .collection(this.returnsCollection)
       .orderBy('createdAt', 'desc')
       .get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
   async updateReturnStatus(id: string, updateData: any) {
     const db = this.firebaseService.getDb();
 
     // Read FIRST before updating
-    const returnSnap = await db.collection(this.returnsCollection).doc(id).get();
+    const returnSnap = await db
+      .collection(this.returnsCollection)
+      .doc(id)
+      .get();
     const returnData = returnSnap.data();
     const items: any[] = returnData?.items || [];
 
@@ -57,7 +60,7 @@ export class PharmacistOrdersService {
     if (updateData.returnStatus === 'approved') {
       for (const item of items) {
         const productCode = item.id;
-        const quantity    = item.quantity || 1;
+        const quantity = item.quantity || 1;
 
         if (!productCode) continue;
 

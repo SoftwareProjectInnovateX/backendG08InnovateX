@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { PharmacistDispensedService } from '../services/pharmacist-dispensed.service.js';
 import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
 
@@ -22,7 +31,10 @@ export class PharmacistDispensedController {
       }
     } catch (err) {
       // If guard didn't run for some reason, continue without blocking
-      console.warn('Could not resolve authenticated user email for dispensed record:', err?.message || err);
+      console.warn(
+        'Could not resolve authenticated user email for dispensed record:',
+        err?.message || err,
+      );
     }
 
     return this.dispensedService.addDispensedRecord(dispenseData);
@@ -31,12 +43,17 @@ export class PharmacistDispensedController {
   @Put(':id/settle-payment')
   @UseGuards(FirebaseAuthGuard)
   async settlePayment(@Param('id') id: string) {
-    return this.dispensedService.updateDispensedRecord(id, { paymentStatus: 'paid' });
+    return this.dispensedService.updateDispensedRecord(id, {
+      paymentStatus: 'paid',
+    });
   }
 
   @Put(':id')
   @UseGuards(FirebaseAuthGuard)
-  async updateDispensedRecord(@Param('id') id: string, @Body() updateData: any) {
+  async updateDispensedRecord(
+    @Param('id') id: string,
+    @Body() updateData: any,
+  ) {
     return this.dispensedService.updateDispensedRecord(id, updateData);
   }
 }

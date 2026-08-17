@@ -1,6 +1,12 @@
 import {
-  Controller, Post, Get, Patch,
-  Param, Body, UploadedFile, UseInterceptors,
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Param,
+  Body,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
@@ -18,7 +24,12 @@ export class PrescriptionsController {
         fileSize: 10 * 1024 * 1024, // 10MB max
       },
       fileFilter: (req, file, cb) => {
-        const allowed = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+        const allowed = [
+          'image/jpeg',
+          'image/png',
+          'image/jpg',
+          'application/pdf',
+        ];
         if (allowed.includes(file.mimetype)) {
           cb(null, true);
         } else {
@@ -29,13 +40,17 @@ export class PrescriptionsController {
   )
   async upload(
     @UploadedFile() file: Express.Multer.File,
-    @Body('customerName')    customerName: string,
-    @Body('customerPhone')   customerPhone: string,
+    @Body('customerName') customerName: string,
+    @Body('customerPhone') customerPhone: string,
     @Body('customerAddress') customerAddress: string,
-    @Body('userId')          userId: string,
+    @Body('userId') userId: string,
   ) {
     return this.prescriptionsService.uploadPrescription(
-      file, customerName, customerPhone, customerAddress, userId,
+      file,
+      customerName,
+      customerPhone,
+      customerAddress,
+      userId,
     );
   }
 
@@ -45,10 +60,7 @@ export class PrescriptionsController {
   }
 
   @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() updateData: any,
-  ) {
+  async update(@Param('id') id: string, @Body() updateData: any) {
     return this.prescriptionsService.updatePrescription(id, updateData);
   }
 }

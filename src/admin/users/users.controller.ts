@@ -1,4 +1,12 @@
-import { Controller, Get, Put, Param, Body, HttpCode, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Param,
+  Body,
+  HttpCode,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service.js';
 import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
 import { RolesGuard } from '../../auth/roles.guard.js';

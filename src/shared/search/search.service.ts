@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-require-imports */
 
 import { Injectable, OnModuleInit } from '@nestjs/common';
@@ -34,7 +31,6 @@ export class SearchService implements OnModuleInit {
   private pinecone!: Pinecone;
   private index!: Index<RecordMetadata>;
   private embedder: any = null;
-
 
   constructor(private firebaseService: FirebaseService) {}
 
@@ -107,9 +103,10 @@ export class SearchService implements OnModuleInit {
   private async keywordSearch(query: string): Promise<Product[]> {
     try {
       const db = this.firebaseService.getDb();
-      
+
       // Prefix search on name (case-sensitive)
-      const snapshot = await db.collection('pharmacistProducts')
+      const snapshot = await db
+        .collection('pharmacistProducts')
         .where('name', '>=', query)
         .where('name', '<=', query + '\uf8ff')
         .limit(20)

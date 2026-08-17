@@ -19,7 +19,10 @@ export class OrdersService {
     } catch (err) {
       console.warn('orderBy failed, falling back to full fetch:', err.message);
       const snapshot = await db.collection(ORDERS_COLLECTION).get();
-      const allDocs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+      const allDocs = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as any[];
       return allDocs.sort((a, b) => {
         const aTime = a.createdAt?._seconds ?? a.createdAt?.seconds ?? 0;
         const bTime = b.createdAt?._seconds ?? b.createdAt?.seconds ?? 0;
@@ -43,18 +46,19 @@ export class OrdersService {
       const orderData = {
         ...orderPayload,
         date: currentTimestamp,
-        createdAt: currentTimestamp
+        createdAt: currentTimestamp,
       };
 
       const docRef = await db.collection(ORDERS_COLLECTION).add(orderData);
 
       return {
         id: docRef.id,
-        ...orderData
+        ...orderData,
       };
     } catch (error) {
-
-      throw new InternalServerErrorException(`Order creation failed: ${error.message}`);
+      throw new InternalServerErrorException(
+        `Order creation failed: ${error.message}`,
+      );
     }
   }
 }

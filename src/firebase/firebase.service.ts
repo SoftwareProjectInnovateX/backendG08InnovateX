@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class FirebaseService {
@@ -7,7 +9,8 @@ export class FirebaseService {
 
   private ensureInitialized() {
     if (!admin.apps.length) {
-      const serviceAccount = require('../../serviceAccountKey.json');
+      const keyPath = path.join(process.cwd(), 'serviceAccountKey.json');
+      const serviceAccount = JSON.parse(fs.readFileSync(keyPath, 'utf8'));
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });

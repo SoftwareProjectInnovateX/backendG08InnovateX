@@ -34,37 +34,49 @@ export class FirebaseAuthGuard implements CanActivate {
 
     try {
       const firebaseAuth = this.firebaseService.getAdmin();
-      const decodedToken: DecodedIdToken = await firebaseAuth.verifyIdToken(token);
+      const decodedToken: DecodedIdToken =
+        await firebaseAuth.verifyIdToken(token);
       const uid = decodedToken.uid;
       const db = this.firebaseService.getDb();
 
       // Fetch user role from Firestore
       let role = decodedToken.role; // Check claims first if any
-      
+
       if (!role) {
         // Try 'admins' collection first
         const adminDoc = await db.collection('admins').doc(uid).get();
         if (adminDoc.exists) {
           role = adminDoc.data()?.role || 'admin';
-          console.log(`[FirebaseAuthGuard] Found in 'admins' collection. Role: ${role}`);
+          console.log(
+            `[FirebaseAuthGuard] Found in 'admins' collection. Role: ${role}`,
+          );
         } else {
           // Try 'users' collection (customers)
           const userDoc = await db.collection('users').doc(uid).get();
           if (userDoc.exists) {
             role = userDoc.data()?.role || 'customer';
-            console.log(`[FirebaseAuthGuard] Found in 'users' collection. Role: ${role}`);
+            console.log(
+              `[FirebaseAuthGuard] Found in 'users' collection. Role: ${role}`,
+            );
           } else {
             // Try 'suppliers'
             const supplierDoc = await db.collection('suppliers').doc(uid).get();
             if (supplierDoc.exists) {
               role = 'supplier';
-              console.log(`[FirebaseAuthGuard] Found in 'suppliers' collection.`);
+              console.log(
+                `[FirebaseAuthGuard] Found in 'suppliers' collection.`,
+              );
             } else {
               // Try 'pharmacists'
-              const pharmacistDoc = await db.collection('pharmacists').doc(uid).get();
+              const pharmacistDoc = await db
+                .collection('pharmacists')
+                .doc(uid)
+                .get();
               if (pharmacistDoc.exists) {
                 role = 'pharmacist';
-                console.log(`[FirebaseAuthGuard] Found in 'pharmacists' collection.`);
+                console.log(
+                  `[FirebaseAuthGuard] Found in 'pharmacists' collection.`,
+                );
               }
             }
           }
@@ -84,7 +96,9 @@ export class FirebaseAuthGuard implements CanActivate {
         isActive = supplierDoc.data()?.status === 'active';
       }
       if (!isActive) {
-        throw new UnauthorizedException('Your account is suspended or pending approval.');
+        throw new UnauthorizedException(
+          'Your account is suspended or pending approval.',
+        );
       }
 
       request.user = {

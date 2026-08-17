@@ -3,7 +3,7 @@ import { FirebaseService } from '../../shared/firebase/firebase.service';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const VALID_VISIBILITY = ['customer', 'pharmacist_only'] as const;
-type Visibility = typeof VALID_VISIBILITY[number];
+type Visibility = (typeof VALID_VISIBILITY)[number];
 
 @Injectable()
 export class ProductsService {
@@ -11,19 +11,17 @@ export class ProductsService {
 
   // ── Read from pendingProducts (not products) ──────────────────────────────
   async getPendingProducts() {
-    const db       = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const snapshot = await db
-      .collection('pendingProducts')   // ✅ fixed collection
+      .collection('pendingProducts') // ✅ fixed collection
       .get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
   async getAllPharmacistProducts() {
-    const db       = this.firebaseService.getDb();
-    const snapshot = await db
-      .collection('pharmacistProducts')
-      .get();
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const db = this.firebaseService.getDb();
+    const snapshot = await db.collection('pharmacistProducts').get();
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   }
 
   async getCustomerProducts() {
@@ -34,18 +32,21 @@ export class ProductsService {
         .where('visibility', '==', 'customer')
         .get();
 
-      const productList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const productList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
       console.log('pharmacistProducts fetched:', productList.length);
 
       const stockSnapshot = await db.collection('products').get();
       const stockMap: Record<string, number> = {};
-      stockSnapshot.docs.forEach(doc => {
+      stockSnapshot.docs.forEach((doc) => {
         const data = doc.data();
         stockMap[data.productCode || doc.id] = data.stock ?? 0;
       });
 
-      return productList.map(p => {
-        const stockId     = (p as any).stockId;
+      return productList.map((p) => {
+        const stockId = (p as any).stockId;
         const productCode = (p as any).productCode;
         return {
           ...p,
@@ -61,7 +62,7 @@ export class ProductsService {
   // ── Delete from pendingProducts so it disappears from the list ────────────
   async approvePending(id: string) {
     const db = this.firebaseService.getDb();
-    await db.collection('pendingProducts').doc(id).delete();  // ✅ fixed
+    await db.collection('pendingProducts').doc(id).delete(); // ✅ fixed
     return { success: true, id };
   }
 
@@ -72,20 +73,70 @@ export class ProductsService {
       ? body.visibility
       : 'customer';
 
-    const docRef = await db.collection('pharmacistProducts').add({
-      name:        body.name,
-      price:       Number(body.price),
-      description: body.description  ?? '',
-      imageUrl:    body.imageUrl     ?? '',
-      category:    body.category     ?? '',
-      supplierId:  body.supplierId   ?? '',
-      stockId:     body.stockId      ?? '',
+    const productPayload: any = {
+      name: body.name,
+      price: Number(body.price),
+      description: body.description ?? '',
+      imageUrl: body.imageUrl ?? '',
+      category: body.category ?? '',
+      supplierId: body.supplierId ?? '',
+      stockId: body.stockId ?? '',
       retailPrice: Number(body.price),
-      tags:        body.tags         ?? [],
+      tags: body.tags ?? [],
       visibility,
-      status:      'active',
-      createdAt:   FieldValue.serverTimestamp(),
-    });
+      status: 'active',
+      createdAt: FieldValue.serverTimestamp(),
+    };
+    if (body.expireDate) {
+      productPayload.expireDate = new Date(body.expireDate);
+    }
+    const docRef = await db
+      .collection('pharmacistProducts')
+      .add(productPayload);
+
+    const adminPayload: any = {
+      productId: docRef.id,
+      supplierId: body.supplierId ?? '',
+      supplierName: 'Pharmacist (Manual Add)',
+      productName: body.name,
+      productCode: body.stockId ?? '',
+      category: body.category ?? '',
+      wholesalePrice: Number(body.price) / 1.2,
+      retailPrice: Number(body.price),
+      stock: body.stock ? Number(body.stock) : 0,
+      minStock: 10,
+      description: body.description ?? '',
+      manufacturer: 'Unknown',
+      availability: 'out of stock',
+      createdAt: FieldValue.serverTimestamp(),
+      lastRestocked: FieldValue.serverTimestamp(),
+    };
+    if (body.expireDate) {
+      adminPayload.expireDate = new Date(body.expireDate);
+    }
+    await db.collection('adminProducts').add(adminPayload);
+
+    // If visibility is 'customer', add to the public 'products' collection so customers can see it
+    if (visibility === 'customer') {
+      const publicProductPayload: any = {
+        name: body.name,
+        price: Number(body.price),
+        description: body.description ?? '',
+        imageUrl: body.imageUrl ?? '',
+        category: body.category ?? '',
+        supplierId: body.supplierId ?? '',
+        stockId: body.stockId ?? '',
+        retailPrice: Number(body.price),
+        tags: body.tags ?? [],
+        visibility,
+        status: 'active',
+        createdAt: FieldValue.serverTimestamp(),
+      };
+      if (body.expireDate) {
+        publicProductPayload.expireDate = new Date(body.expireDate);
+      }
+      await db.collection('products').doc(docRef.id).set(publicProductPayload);
+    }
 
     return { success: true, id: docRef.id, visibility };
   }
@@ -98,10 +149,7 @@ export class ProductsService {
     }
 
     const db = this.firebaseService.getDb();
-    await db
-      .collection('pharmacistProducts')
-      .doc(id)
-      .update({ visibility });
+    await db.collection('pharmacistProducts').doc(id).update({ visibility });
 
     return { success: true, id, visibility };
   }
@@ -124,7 +172,10 @@ export class ProductsService {
     const directDoc = await db.collection('products').doc(productCode).get();
     if (directDoc.exists) return directDoc;
 
-    const pharmDoc = await db.collection('pharmacistProducts').doc(productCode).get();
+    const pharmDoc = await db
+      .collection('pharmacistProducts')
+      .doc(productCode)
+      .get();
     if (pharmDoc.exists) {
       const stockId = pharmDoc.data()?.stockId;
       if (stockId) {
@@ -166,11 +217,11 @@ export class ProductsService {
     }
 
     let before = 0;
-    let after  = 0;
+    let after = 0;
     await db.runTransaction(async (transaction) => {
       const docSnap = await transaction.get(productDoc.ref);
       before = docSnap.data()?.stock ?? 0;
-      after  = Math.max(0, before - quantity);
+      after = Math.max(0, before - quantity);
       transaction.update(productDoc.ref, { stock: after });
     });
 
@@ -190,11 +241,11 @@ export class ProductsService {
     }
 
     let before = 0;
-    let after  = 0;
+    let after = 0;
     await db.runTransaction(async (transaction) => {
       const docSnap = await transaction.get(productDoc.ref);
       before = docSnap.data()?.stock ?? 0;
-      after  = before + quantity;
+      after = before + quantity;
       transaction.update(productDoc.ref, { stock: after });
     });
 
@@ -202,8 +253,11 @@ export class ProductsService {
     return { success: true, productCode, before, after };
   }
 
-  private async updateAdminProductStock(productDocId: string, quantity: number) {
-    const db        = this.firebaseService.getDb();
+  private async updateAdminProductStock(
+    productDocId: string,
+    quantity: number,
+  ) {
+    const db = this.firebaseService.getDb();
     const adminSnap = await db
       .collection('adminProducts')
       .where('productId', '==', productDocId)

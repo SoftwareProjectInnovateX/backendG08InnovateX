@@ -6,11 +6,7 @@ import { CountersModule } from '../../shared/counters/counters.module.js';
 import { MailModule } from '../../shared/mail/mail.module.js';
 
 @Module({
-  imports: [
-    FirebaseModule,
-    CountersModule,
-    MailModule,
-  ],
+  imports: [FirebaseModule, CountersModule, MailModule],
   controllers: [AdminProductApprovalController],
   providers: [AdminProductApprovalService],
   exports: [AdminProductApprovalService],

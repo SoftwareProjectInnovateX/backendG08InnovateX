@@ -19,13 +19,13 @@ import { AdminSearchModule } from './admin/search/search.module.js';
 import { AccountRequestsModule } from './admin/account-requests/account-requests.module.js';
 import { ChatModule } from './admin/chat/chat.module.js';
 import { AdminProductApprovalModule } from './admin/adminProducts/admin-product-approval.module.js';
-import { ForecastModule } from './admin/forecast/forecast.module.js';  
+import { ForecastModule } from './admin/forecast/forecast.module.js';
 
 // Supplier
 import { SupplierProductsModule } from './supplier/products/supplier-products.module.js';
 import { PurchaseOrdersModule } from './supplier/purchase-orders/purchase-orders.module.js';
 import { InvoicesModule } from './supplier/invoices/invoices.module.js';
-import { AiAnalyticsModule } from './supplier/ai-analytics/ai-analytics.module.js'; 
+import { AiAnalyticsModule } from './supplier/ai-analytics/ai-analytics.module.js';
 
 // Pharmacist
 import { PrescriptionsModule } from './pharmacist/prescriptions/prescriptions.module.js';
@@ -66,20 +66,20 @@ import { BlogModule } from './customer/blog/blog.module.js';
     AccountRequestsModule,
     ChatModule,
     AdminProductApprovalModule,
-    ScheduleModule.forRoot(),   // enables @Cron
+    ScheduleModule.forRoot(), // enables @Cron
     ForecastModule,
 
     // Supplier
     SupplierProductsModule,
     PurchaseOrdersModule,
-     InvoicesModule,
-     AiAnalyticsModule, 
+    InvoicesModule,
+    AiAnalyticsModule,
 
     // Pharmacist
     PrescriptionsModule,
     PharmacistModule,
     PharmacistProductsModule,
-    AiModule ,
+    AiModule,
 
     // Customer
     CartModule,

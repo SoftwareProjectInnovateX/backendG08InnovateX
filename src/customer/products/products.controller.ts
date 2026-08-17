@@ -1,4 +1,13 @@
-import { Controller, Get, Put, Param, Body, Query, BadRequestException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Put,
+  Param,
+  Body,
+  Query,
+  BadRequestException,
+  UseGuards,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard.js';
 
@@ -11,14 +20,18 @@ export class ProductsController {
   async getProducts(@Query('category') category?: string) {
     return this.productsService.getProducts(category);
   }
-   //reduce stock by 1 when added to cart
+  //reduce stock by 1 when added to cart
   @UseGuards(FirebaseAuthGuard)
   @Put(':productCode/decrement-stock')
   async decrementStock(
     @Param('productCode') productCode: string,
     @Body() body: { quantity: number },
   ) {
-    if (!body.quantity || body.quantity < 1 || !Number.isInteger(body.quantity)) {
+    if (
+      !body.quantity ||
+      body.quantity < 1 ||
+      !Number.isInteger(body.quantity)
+    ) {
       throw new BadRequestException('Quantity must be a positive integer');
     }
     if (!productCode?.trim()) {
@@ -33,7 +46,11 @@ export class ProductsController {
     @Param('productCode') productCode: string,
     @Body() body: { quantity: number },
   ) {
-    if (!body.quantity || body.quantity < 1 || !Number.isInteger(body.quantity)) {
+    if (
+      !body.quantity ||
+      body.quantity < 1 ||
+      !Number.isInteger(body.quantity)
+    ) {
       throw new BadRequestException('Quantity must be a positive integer');
     }
     if (!productCode?.trim()) {

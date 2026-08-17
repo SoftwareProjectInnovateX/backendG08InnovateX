@@ -21,7 +21,12 @@ export class ProfileService {
       .get();
 
     if (ordersSnap.empty) {
-      return { loyaltyPoints: 0, totalPoints: 0, level: 'Silver', recommendedOffers: [] };
+      return {
+        loyaltyPoints: 10,
+        totalPoints: 10,
+        level: 'Silver',
+        recommendedOffers: [],
+      };
     }
 
     const totalPoints = ordersSnap.docs.reduce((sum: number, doc: any) => {
@@ -76,22 +81,25 @@ export class ProfileService {
       const order = ordersSnap.docs[0].data();
 
       // Auto-create users doc so future calls are faster
-      await db.collection('users').doc(uid).set({
-        fullName:  order.customerName || '',
-        email:     order.email        || '',
-        phone:     order.phone        || '',
-        role:      'customer',
-        status:    'active',
-        createdAt: FieldValue.serverTimestamp(),
-      });
+      await db
+        .collection('users')
+        .doc(uid)
+        .set({
+          fullName: order.customerName || '',
+          email: order.email || '',
+          phone: order.phone || '',
+          role: 'customer',
+          status: 'active',
+          createdAt: FieldValue.serverTimestamp(),
+        });
 
       return {
-        id:       uid,
+        id: uid,
         fullName: order.customerName || '',
-        email:    order.email        || '',
-        phone:    order.phone        || '',
-        role:     'customer',
-        status:   'active',
+        email: order.email || '',
+        phone: order.phone || '',
+        role: 'customer',
+        status: 'active',
         ...loyaltyData,
       };
     }
@@ -100,7 +108,7 @@ export class ProfileService {
   }
 
   async updateProfile(uid: string, body: any) {
-    const db     = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const docRef = db.collection('users').doc(uid);
 
     const updatePayload: any = {
@@ -108,10 +116,10 @@ export class ProfileService {
     };
 
     // only update fields that are provided
-    if (body.fullName  !== undefined) updatePayload.fullName  = body.fullName;
-    if (body.phone     !== undefined) updatePayload.phone     = body.phone;
-    if (body.address   !== undefined) updatePayload.address   = body.address;
-    if (body.photoURL  !== undefined) updatePayload.photoURL  = body.photoURL;
+    if (body.fullName !== undefined) updatePayload.fullName = body.fullName;
+    if (body.phone !== undefined) updatePayload.phone = body.phone;
+    if (body.address !== undefined) updatePayload.address = body.address;
+    if (body.photoURL !== undefined) updatePayload.photoURL = body.photoURL;
 
     await docRef.update(updatePayload);
 

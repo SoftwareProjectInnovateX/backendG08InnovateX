@@ -13,7 +13,9 @@ export class AIService {
       });
     } else {
       this.openai = null;
-      console.warn('⚠️  OpenAI API key not configured. AI features will use fallback responses.');
+      console.warn(
+        '⚠️  OpenAI API key not configured. AI features will use fallback responses.',
+      );
     }
   }
 
@@ -25,7 +27,7 @@ export class AIService {
         'Free delivery on orders over $50',
         'Bonus loyalty points on vitamins',
         'Birthday special - 15% off your favorite items',
-        'Refer a friend and earn bonus points'
+        'Refer a friend and earn bonus points',
       ];
     }
 
@@ -49,18 +51,33 @@ export class AIService {
         max_tokens: 200,
       });
 
-      const suggestions = response.choices[0]?.message?.content?.split('\n').filter(line => line.trim()) || [];
+      const suggestions =
+        response.choices[0]?.message?.content
+          ?.split('\n')
+          .filter((line) => line.trim()) || [];
       return suggestions.slice(0, 5);
     } catch (error) {
       console.error('AI service error:', error);
-      return ['10% discount on next purchase', 'Free delivery on orders over $50', 'Bonus loyalty points on vitamins'];
+      return [
+        '10% discount on next purchase',
+        'Free delivery on orders over $50',
+        'Bonus loyalty points on vitamins',
+      ];
     }
   }
 
   async predictChurnRisk(customerData: any): Promise<number> {
     // Simple heuristic for now, can be enhanced with ML model
-    const daysSinceLastPurchase = (Date.now() - new Date(customerData.lastPurchase).getTime()) / (1000 * 60 * 60 * 24);
-    const risk = Math.min(100, Math.max(0, (daysSinceLastPurchase - 30) * 2 + (100 - customerData.purchaseCount)));
+    const daysSinceLastPurchase =
+      (Date.now() - new Date(customerData.lastPurchase).getTime()) /
+      (1000 * 60 * 60 * 24);
+    const risk = Math.min(
+      100,
+      Math.max(
+        0,
+        (daysSinceLastPurchase - 30) * 2 + (100 - customerData.purchaseCount),
+      ),
+    );
     return Math.round(risk);
   }
 
@@ -72,7 +89,7 @@ export class AIService {
         'Family health package discounts',
         'Senior citizen wellness rewards',
         'Seasonal vitamin promotion campaigns',
-        'Loyalty points for health check referrals'
+        'Loyalty points for health check referrals',
       ];
     }
 
@@ -92,7 +109,11 @@ export class AIService {
         max_tokens: 300,
       });
 
-      return response.choices[0]?.message?.content?.split('\n').filter(line => line.trim()) || [];
+      return (
+        response.choices[0]?.message?.content
+          ?.split('\n')
+          .filter((line) => line.trim()) || []
+      );
     } catch (error) {
       console.error('AI service error:', error);
       return [
@@ -100,7 +121,7 @@ export class AIService {
         'Family health package discounts',
         'Senior citizen wellness rewards',
         'Seasonal vitamin promotion campaigns',
-        'Loyalty points for health check referrals'
+        'Loyalty points for health check referrals',
       ];
     }
   }

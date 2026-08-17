@@ -76,9 +76,15 @@ export class ForecastService {
         dailySales: new Array(7).fill(0),
       };
 
-      const { forecast7d, forecast30d, dailyAvg } = this.predictDemand(sales.dailySales);
+      const { forecast7d, forecast30d, dailyAvg } = this.predictDemand(
+        sales.dailySales,
+      );
 
-      const risk = this.calculateStockRisk(product.stock, forecast7d, product.minStock);
+      const risk = this.calculateStockRisk(
+        product.stock,
+        forecast7d,
+        product.minStock,
+      );
 
       const daysUntilStockout =
         dailyAvg > 0 ? Math.floor(product.stock / dailyAvg) : null;
@@ -114,7 +120,9 @@ export class ForecastService {
     const today = new Date().toISOString().split('T')[0];
 
     for (const item of results) {
-      const ref = db.collection('salesForecasts').doc(`${today}_${item.productId}`);
+      const ref = db
+        .collection('salesForecasts')
+        .doc(`${today}_${item.productId}`);
       batch.set(ref, { ...item, generatedAt: new Date() });
     }
 
@@ -133,7 +141,7 @@ export class ForecastService {
       .get();
 
     return snapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() } as CustomerOrder))
+      .map((doc) => ({ id: doc.id, ...doc.data() }) as CustomerOrder)
       .filter(
         (order) =>
           COMPLETED_STATUSES.includes(order.orderStatus ?? '') ||

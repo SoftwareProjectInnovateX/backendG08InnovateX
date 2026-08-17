@@ -15,9 +15,15 @@ export class UsersService {
         .get();
       return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     } catch (err) {
-      console.warn('orderBy/where failed, falling back to full fetch:', err.message);
+      console.warn(
+        'orderBy/where failed, falling back to full fetch:',
+        err.message,
+      );
       const snapshot = await db.collection('users').get();
-      const allDocs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+      const allDocs = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as any[];
       return allDocs
         .filter((u) => !u.role || u.role === 'customer')
         .sort((a, b) => {

@@ -13,7 +13,7 @@ export class CartService {
   // GET CART ITEMS BY CUSTOMER
   // ==============================
   async getCart(customerId: string) {
-    const db       = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const snapshot = await db
       .collection('cart')
       .where('customerId', '==', customerId)
@@ -58,7 +58,10 @@ export class CartService {
     if (!existingSnap.empty) {
       const docs = existingSnap.docs;
       const keptDoc = docs[0];
-      const existingQty = docs.reduce((sum, doc) => sum + Number(doc.data()?.qty || 0), 0);
+      const existingQty = docs.reduce(
+        (sum, doc) => sum + Number(doc.data()?.qty || 0),
+        0,
+      );
       const newQty = existingQty + Number(body.qty || 1);
 
       if (docs.length > 1) {
@@ -68,7 +71,10 @@ export class CartService {
       }
 
       const existingData = keptDoc.data();
-      if ((!existingData.category || existingData.category === '') && body.category) {
+      if (
+        (!existingData.category || existingData.category === '') &&
+        body.category
+      ) {
         await keptDoc.ref.update({ category: body.category });
       }
 
@@ -78,13 +84,13 @@ export class CartService {
 
     const docRef = await db.collection('cart').add({
       customerId: body.customerId,
-      productId:  productId,
-      stockId:    body.stockId || productId,
-      name:       body.name,
-      price:      Number(body.price)  || 0,
-      imageUrl:   body.imageUrl       || '',
-      category:   body.category       || '',
-      qty:        Number(body.qty)    || 1,
+      productId: productId,
+      stockId: body.stockId || productId,
+      name: body.name,
+      price: Number(body.price) || 0,
+      imageUrl: body.imageUrl || '',
+      category: body.category || '',
+      qty: Number(body.qty) || 1,
     });
     return { success: true, id: docRef.id, ...body };
   }
@@ -93,18 +99,22 @@ export class CartService {
   // UPDATE QTY
   // ==============================
   async updateQty(id: string, qty: number) {
-    const db  = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const ref = db.collection('cart').doc(id);
     const snap = await ref.get();
     if (!snap.exists) {
       return { success: false, message: 'Cart item not found' };
     }
 
-    const item = snap.data() as { qty?: number; stockId?: string; productId?: string };
+    const item = snap.data() as {
+      qty?: number;
+      stockId?: string;
+      productId?: string;
+    };
     const currentQty = Number(item?.qty) || 0;
-    const nextQty    = Number(qty) || 0;
-    const delta      = nextQty - currentQty;
-    const stockKey   = item?.stockId || item?.productId || '';
+    const nextQty = Number(qty) || 0;
+    const delta = nextQty - currentQty;
+    const stockKey = item?.stockId || item?.productId || '';
 
     if (delta > 0) {
       await this.productsService.decrementStock(stockKey, delta);
@@ -133,7 +143,11 @@ export class CartService {
       return { success: false, message: 'Cart item not found' };
     }
 
-    const item = snap.data() as { qty?: number; stockId?: string; productId?: string };
+    const item = snap.data() as {
+      qty?: number;
+      stockId?: string;
+      productId?: string;
+    };
     const stockKey = item?.stockId || item?.productId || '';
     await this.productsService.incrementStock(stockKey, Number(item?.qty) || 1);
     await ref.delete();
@@ -144,7 +158,7 @@ export class CartService {
   // CLEAR CART BY CUSTOMER
   // ==============================
   async clearCart(customerId: string) {
-    const db       = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const snapshot = await db
       .collection('cart')
       .where('customerId', '==', customerId)
@@ -155,11 +169,14 @@ export class CartService {
     for (const doc of snapshot.docs) {
       const item = doc.data();
       const stockKey = item.stockId || item.productId || '';
-      await this.productsService.incrementStock(stockKey, Number(item.qty) || 1);
+      await this.productsService.incrementStock(
+        stockKey,
+        Number(item.qty) || 1,
+      );
     }
 
     const batch = db.batch();
-    snapshot.docs.forEach(doc => batch.delete(doc.ref));
+    snapshot.docs.forEach((doc) => batch.delete(doc.ref));
     await batch.commit();
     return { success: true };
   }
