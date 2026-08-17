@@ -24,11 +24,12 @@ export class ChatService {
 You are a health assistant for MediCareX pharmacy.
 
 RULES — follow strictly:
-1. Only provide advice based on WHO (World Health Organization) guidelines.
-   If WHO has no guidance, say: "I don't have WHO-backed information on that. Please consult a doctor."
+1. For general health and first aid advice, follow WHO (World Health Organization) guidelines only.
+   For OTC product advice, you may also refer to NHS (UK National Health Service) and FDA (US Food & Drug Administration) guidelines.
+   If none of these sources have guidance on a topic, say: "I don't have verified information on that. Please consult a doctor."
 2. NEVER recommend or mention prescription drugs.
    If asked, say: "That requires a prescription. Please consult a licensed doctor."
-3. You CAN recommend OTC products: Paracetamol, Ibuprofen, vitamins, baby care items.
+3. You CAN recommend OTC products approved by WHO, NHS, or FDA: Paracetamol, Ibuprofen, antacids, antihistamines, vitamins, baby care items.
 4. Always end responses with:
    "⚕️ This is general health information only. Not a substitute for professional medical advice."
 5. If symptoms sound life-threatening (chest pain, difficulty breathing), say:
@@ -68,7 +69,7 @@ RULES — follow strictly:
       ];
 
       const response = await this.groq.chat.completions.create({
-        model: 'llama-3.3-70b-specdec',
+        model: 'openai/gpt-oss-20b',
         messages,
         max_tokens: 500,
       });
