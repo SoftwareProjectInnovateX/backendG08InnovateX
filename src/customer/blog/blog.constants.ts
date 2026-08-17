@@ -4,6 +4,6 @@ export const BLOG_STATUS = {
 };
 
 export const BLOG_CONFIG = {
-  DAILY_CRON: '0 0 * * 1,4', // Executes every Mon and Thu at midnight
+  DAILY_CRON: '0 0 * * *', // Executes daily at midnight
   LANDING_PAGE_LIMIT: 10,
 };
