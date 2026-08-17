@@ -23,7 +23,7 @@ export class AnalyseInvoicesDto {
   invoices!: InvoiceRecord[];
 }
 
-/* ── Added for POST /ai/generate-summary-pdf ── */
+/* ── Used for analytics results ── */
 
 export interface SupplyRecommendation {
   productName: string;
@@ -66,10 +66,25 @@ export interface RestockSuggestion {
   confidence: number;
 }
 
+/* ── POST /ai/generate-summary-pdf ── */
+
 export class GenerateSummaryPdfDto {
   supplierId!: string;
   generatedAt!: string;
   invoiceCount!: number;
+
+  supplyRecommendations!: SupplyRecommendation[];
+  demandForecast!: DemandForecastItem[];
+  paymentRisk!: PaymentRiskItem[];
+  restockSuggestions!: RestockSuggestion[];
+}
+
+/* ── POST /ai/business-advisor ── */
+
+export class GenerateBusinessAdvisorDto {
+  supplierId!: string;
+  invoiceCount!: number;
+
   supplyRecommendations!: SupplyRecommendation[];
   demandForecast!: DemandForecastItem[];
   paymentRisk!: PaymentRiskItem[];

@@ -13,6 +13,10 @@ import { MailService } from './mail.service.js';
           host: 'smtp.gmail.com',
           port: 465,
           secure: true,
+          ignoreTLS: false,
+          requireTLS: true,
+          // @ts-ignore: Force IPv4 as Railway drops IPv6
+          family: 4,
           auth: {
             user: config.get<string>('MAIL_USER'),
             pass: config.get<string>('MAIL_PASS'),

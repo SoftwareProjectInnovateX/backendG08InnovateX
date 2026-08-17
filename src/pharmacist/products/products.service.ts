@@ -90,7 +90,9 @@ export class ProductsService {
     if (body.expireDate) {
       productPayload.expireDate = new Date(body.expireDate);
     }
-    const docRef = await db.collection('pharmacistProducts').add(productPayload);
+    const docRef = await db
+      .collection('pharmacistProducts')
+      .add(productPayload);
 
     const adminPayload: any = {
       productId: docRef.id,

@@ -4,6 +4,7 @@ import {
   AnalyseInvoicesDto,
   InvoiceRecord,
   GenerateSummaryPdfDto,
+  GenerateBusinessAdvisorDto,
 } from './dto/ai-analytics.dto.js';
 
 function groupBy<T>(arr: T[], key: (item: T) => string): Record<string, T[]> {
@@ -23,7 +24,29 @@ function daysBetween(iso1: string, iso2: string): number {
   );
 }
 
+interface ProductAnalyticsRecord extends InvoiceRecord {
+  productName: string;
+  totalAmount: number;
+}
+
+function expandInvoiceItems(
+  invoices: InvoiceRecord[],
+): ProductAnalyticsRecord[] {
+  return invoices.flatMap((inv) => {
+    if (!inv.items?.length) return [{ ...inv }];
+
+    return inv.items.map((item) => ({
+      ...inv,
+      productName: item.productName,
+      totalAmount: Math.max(0, item.quantity) * Math.max(0, item.unitPrice),
+    }));
+  });
+}
+
 /* ── PDF layout constants (used only by generateSummaryPdf) ── */
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+
 const PAGE_MARGIN = 40;
 const PDF_COLORS = {
   blue: '#2563eb',
@@ -39,7 +62,8 @@ const PDF_COLORS = {
 @Injectable()
 export class AiAnalyticsService {
   supplyRecommendations(dto: AnalyseInvoicesDto) {
-    const grouped = groupBy(dto.invoices, (inv) => inv.productName);
+    const productRecords = expandInvoiceItems(dto.invoices);
+    const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const recommendations = Object.entries(grouped).map(
       ([productName, invs]) => {
@@ -105,10 +129,14 @@ export class AiAnalyticsService {
   }
 
   demandForecast(dto: AnalyseInvoicesDto) {
-    const grouped = groupBy(dto.invoices, (inv) => inv.productName);
+    const productRecords = expandInvoiceItems(dto.invoices);
+    const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const forecasts = Object.entries(grouped)
-      .filter(([, invs]) => invs.length >= 2)
+      .filter(
+        ([, invs]) =>
+          new Set(invs.map((inv) => inv.invoiceDate.slice(0, 7))).size >= 3,
+      )
       .map(([productName, invs]) => {
         const byMonth: Record<string, number> = {};
         invs.forEach((inv) => {
@@ -182,7 +210,13 @@ export class AiAnalyticsService {
         ? Math.max(0, daysBetween(inv.dueDate, today))
         : 0;
       const pharmacyStat = pharmacyStats[inv.pharmacy] ?? { total: 1, late: 0 };
-      const lateRate = pharmacyStat.late / pharmacyStat.total;
+      const historicalTotal = Math.max(0, pharmacyStat.total - 1);
+      const historicalLate = Math.max(
+        0,
+        pharmacyStat.late - (inv.paymentStatus === 'Overdue' ? 1 : 0),
+      );
+      const lateRate =
+        historicalTotal > 0 ? historicalLate / historicalTotal : 0;
 
       let riskScore = 0;
       riskScore += Math.min(40, daysOverdue * 2);
@@ -208,7 +242,7 @@ export class AiAnalyticsService {
         pharmacy: inv.pharmacy,
         amount: inv.totalAmount,
         dueDate: inv.dueDate,
-        daysOverdue: daysOverdue > 0 ? daysOverdue : null,
+        daysOverdue,
         riskScore,
         riskLevel,
         reason: reason.trim(),
@@ -220,7 +254,8 @@ export class AiAnalyticsService {
   }
 
   restockSuggestions(dto: AnalyseInvoicesDto) {
-    const grouped = groupBy(dto.invoices, (inv) => inv.productName);
+    const productRecords = expandInvoiceItems(dto.invoices);
+    const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const suggestions = Object.entries(grouped).map(([productName, invs]) => {
       const recentCutoff = new Date();
@@ -276,6 +311,113 @@ export class AiAnalyticsService {
     });
 
     return { suggestions };
+  }
+
+  /* ── Groq AI Business Advisor ── */
+  async businessAdvisor(dto: GenerateBusinessAdvisorDto) {
+    const apiKey = process.env.GROQ_API_KEY;
+
+    if (!apiKey) {
+      throw new InternalServerErrorException(
+        'GROQ_API_KEY is not configured on the backend.',
+      );
+    }
+
+    const analyticsPayload = {
+      invoiceCount: dto.invoiceCount,
+      supplyRecommendations: dto.supplyRecommendations,
+      demandForecast: dto.demandForecast,
+      paymentRisk: dto.paymentRisk,
+      restockSuggestions: dto.restockSuggestions,
+    };
+
+    const systemPrompt = `You are the MediCareX Supplier Business Advisor.
+You receive already-calculated supplier analytics from deterministic statistical and rule-based algorithms.
+Your job is ONLY to interpret those results and turn them into short, practical business advice.
+Do not recalculate or change any numeric value. Do not invent products, invoices, risks, trends, or figures.
+Keep the advice suitable for a pharmacy supplier dashboard.
+Return ONLY valid JSON with exactly this structure:
+{
+  "summary": "2-4 sentence overall summary",
+  "priorityActions": ["action 1", "action 2", "action 3"],
+  "watchItems": ["watch item 1", "watch item 2"]
+}
+Use a maximum of 3 priority actions and 2 watch items. If there is nothing important, use an empty array.`;
+
+    try {
+      const response = await fetch(GROQ_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          temperature: 0.2,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: `Supplier analytics:\n${JSON.stringify(analyticsPayload)}`,
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Groq API error:', response.status, errorText);
+        throw new Error(`Groq API returned HTTP ${response.status}`);
+      }
+
+      const data = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+
+      const rawContent = data.choices?.[0]?.message?.content?.trim();
+      if (!rawContent) {
+        throw new Error('Groq returned an empty response.');
+      }
+
+      const cleaned = rawContent
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/```$/i, '')
+        .trim();
+
+      let parsed: {
+        summary?: string;
+        priorityActions?: string[];
+        watchItems?: string[];
+      };
+
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        parsed = {
+          summary: cleaned,
+          priorityActions: [],
+          watchItems: [],
+        };
+      }
+
+      return {
+        provider: 'Groq',
+        model: GROQ_MODEL,
+        summary: parsed.summary || 'No AI summary was generated.',
+        priorityActions: Array.isArray(parsed.priorityActions)
+          ? parsed.priorityActions.slice(0, 3)
+          : [],
+        watchItems: Array.isArray(parsed.watchItems)
+          ? parsed.watchItems.slice(0, 2)
+          : [],
+      };
+    } catch (error) {
+      console.error('Groq business advisor failed:', error);
+      throw new InternalServerErrorException(
+        'Failed to generate Groq business advice.',
+      );
+    }
   }
 
   /* ── Added: POST /ai/generate-summary-pdf ── */
@@ -526,7 +668,7 @@ export class AiAnalyticsService {
         .fillColor(PDF_COLORS.slate)
         .fontSize(9)
         .text(
-          `Amount: Rs. ${risk.amount.toFixed(2)}   ·   Due: ${risk.dueDate}   ·   Overdue: ${risk.daysOverdue ? risk.daysOverdue + 'd' : 'N/A'}   ·   Risk Score: ${risk.riskScore}%`,
+          `Amount: Rs. ${risk.amount.toFixed(2)}   ·   Due: ${risk.dueDate}   ·   Overdue: ${risk.daysOverdue != null ? risk.daysOverdue + 'd' : 'N/A'}   ·   Risk Score: ${risk.riskScore}%`,
           PAGE_MARGIN,
           doc.y + 4,
           { width: 500 },

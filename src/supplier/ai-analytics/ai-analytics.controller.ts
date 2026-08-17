@@ -7,10 +7,12 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import type { Response } from 'express';
+
 import { AiAnalyticsService } from './ai-analytics.service.js';
 import {
   AnalyseInvoicesDto,
   GenerateSummaryPdfDto,
+  GenerateBusinessAdvisorDto,
 } from './dto/ai-analytics.dto.js';
 
 @Controller('ai')
@@ -37,8 +39,13 @@ export class AiAnalyticsController {
     return this.aiAnalyticsService.restockSuggestions(dto);
   }
 
-  // Added: POST /ai/generate-summary-pdf
-  // Backs downloadSummaryPDF() in AIAnalytics.jsx
+  // Groq-powered business advisor
+  @Post('business-advisor')
+  @HttpCode(HttpStatus.OK)
+  async businessAdvisor(@Body() dto: GenerateBusinessAdvisorDto) {
+    return await this.aiAnalyticsService.businessAdvisor(dto);
+  }
+
   @Post('generate-summary-pdf')
   @HttpCode(HttpStatus.OK)
   async generateSummaryPdf(
@@ -49,7 +56,9 @@ export class AiAnalyticsController {
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="AI-Analytics-Summary-${new Date(dto.generatedAt).toISOString().split('T')[0]}.pdf"`,
+      'Content-Disposition': `attachment; filename="AI-Analytics-Summary-${
+        new Date(dto.generatedAt).toISOString().split('T')[0]
+      }.pdf"`,
       'Content-Length': pdfBuffer.length,
     });
 
