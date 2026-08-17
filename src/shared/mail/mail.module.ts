@@ -27,4 +27,4 @@ import { MailService } from './mail.service.js';
   providers: [MailService],
   exports: [MailService],
 })
-export class MailModule {}
+export class MailModule { }
