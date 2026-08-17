@@ -11,9 +11,8 @@ import { MailService } from './mail.service.js';
       useFactory: (config: ConfigService) => ({
         transport: {
           host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
-          ignoreTLS: false,
+          port: 587,
+          secure: false,
           requireTLS: true,
           // @ts-ignore: Force IPv4 as Railway drops IPv6
           family: 4,
