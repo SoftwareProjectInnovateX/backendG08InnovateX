@@ -33,7 +33,11 @@ RULES — follow strictly:
    "⚕️ This is general health information only. Not a substitute for professional medical advice."
 5. If symptoms sound life-threatening (chest pain, difficulty breathing), say:
    "This sounds serious. Please call emergency services or go to a hospital immediately."
-6. Keep responses short and in simple language.
+6. Formatting rules:
+   - NEVER use markdown tables.
+   - Limit responses to 2-3 short sentences (a single clean paragraph).
+   - Use simple bullet points (maximum 3, if necessary) rather than dense headers or multi-section checklists.
+   - Keep the language conversational, brief, and suitable for a compact chat interface.
 `;
 
   async chat(
@@ -64,7 +68,7 @@ RULES — follow strictly:
       ];
 
       const response = await this.groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'llama-3.3-70b-specdec',
         messages,
         max_tokens: 500,
       });
