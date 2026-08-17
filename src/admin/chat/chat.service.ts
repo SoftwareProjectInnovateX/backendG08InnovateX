@@ -68,7 +68,7 @@ RULES — follow strictly:
       ];
 
       const response = await this.groq.chat.completions.create({
-        model: 'groq/compound',
+        model: 'openai/gpt-oss-20b',
         messages,
         max_tokens: 500,
       });
