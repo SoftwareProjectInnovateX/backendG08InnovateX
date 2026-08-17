@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Param, Body, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Param,
+  Body,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { LoyaltyService, LoyaltyCustomer } from './loyalty.service';
 import { AIService } from './ai.service';
 import { FirebaseAuthGuard } from '../../auth/firebase-auth.guard';
@@ -104,7 +113,11 @@ export class LoyaltyController {
     @Body() body: { uid: string; orderAmount: number; orderId: string },
   ) {
     try {
-      await this.loyaltyService.addPurchase(body.uid, body.orderAmount, body.orderId);
+      await this.loyaltyService.addPurchase(
+        body.uid,
+        body.orderAmount,
+        body.orderId,
+      );
       return { success: true };
     } catch (error) {
       const err = error as Error;

@@ -1,7 +1,17 @@
-import { Controller, Post, Body, Res, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Res,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { AiAnalyticsService } from './ai-analytics.service.js';
-import { AnalyseInvoicesDto, GenerateSummaryPdfDto } from './dto/ai-analytics.dto.js';
+import {
+  AnalyseInvoicesDto,
+  GenerateSummaryPdfDto,
+} from './dto/ai-analytics.dto.js';
 
 @Controller('ai')
 export class AiAnalyticsController {
@@ -31,7 +41,10 @@ export class AiAnalyticsController {
   // Backs downloadSummaryPDF() in AIAnalytics.jsx
   @Post('generate-summary-pdf')
   @HttpCode(HttpStatus.OK)
-  async generateSummaryPdf(@Body() dto: GenerateSummaryPdfDto, @Res() res: Response) {
+  async generateSummaryPdf(
+    @Body() dto: GenerateSummaryPdfDto,
+    @Res() res: Response,
+  ) {
     const pdfBuffer = await this.aiAnalyticsService.generateSummaryPdf(dto);
 
     res.set({

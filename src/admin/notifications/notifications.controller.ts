@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Patch, Delete, Param, Query, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Query,
+  Body,
+} from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 
 @Controller('notifications')
@@ -13,14 +22,17 @@ export class NotificationsController {
 
   // POST /notifications/order-shipped
   @Post('order-shipped')
-  createOrderShipped(@Body() body: {
-    orderId: string;
-    poId: string;
-    supplierName?: string;
-    courier?: string;
-    trackingNumber: string;
-    trackingUrl?: string;
-  }) {
+  createOrderShipped(
+    @Body()
+    body: {
+      orderId: string;
+      poId: string;
+      supplierName?: string;
+      courier?: string;
+      trackingNumber: string;
+      trackingUrl?: string;
+    },
+  ) {
     return this.notificationsService.createOrderShippedNotification(body);
   }
 

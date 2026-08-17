@@ -10,7 +10,11 @@ export class PharmacistInventoryService {
   async getInventory() {
     const db = this.firebaseService.getDb();
     const snapshot = await db.collection(this.collectionName).get();
-    return snapshot.docs.map(doc => ({ firebaseId: doc.id, id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => ({
+      firebaseId: doc.id,
+      id: doc.id,
+      ...doc.data(),
+    }));
   }
 
   async addInventoryItem(itemData: any) {

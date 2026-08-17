@@ -5,11 +5,10 @@ import { v2 as cloudinary } from 'cloudinary';
 
 @Injectable()
 export class PrescriptionsService {
-
   constructor() {
     cloudinary.config({
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key:    process.env.CLOUDINARY_API_KEY,
+      api_key: process.env.CLOUDINARY_API_KEY,
       api_secret: process.env.CLOUDINARY_API_SECRET,
     });
   }
@@ -31,14 +30,16 @@ export class PrescriptionsService {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder:        'prescriptions',
+          folder: 'prescriptions',
           resource_type: 'auto', // handles both images and PDFs
         },
-      (error, result) => {
-  if (error) return reject(error);
-  if (!result) return reject(new Error('Cloudinary upload returned no result'));
-  resolve(result.secure_url);
-},
+        (error: any, result) => {
+          if (error)
+            return reject(new Error(error.message || JSON.stringify(error)));
+          if (!result)
+            return reject(new Error('Cloudinary upload returned no result'));
+          resolve(result.secure_url);
+        },
       );
       uploadStream.end(file.buffer);
     });
@@ -58,16 +59,16 @@ export class PrescriptionsService {
       customerName,
       customerPhone,
       customerAddress,
-      userId:    userId || null,
-      imageUrl,                  // clean URL, not base64
-      status:    'Pending',
+      userId: userId || null,
+      imageUrl, // clean URL, not base64
+      status: 'Pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     try {
       await this.transporter.sendMail({
-        from:    `"MediCare Pharmacy" <${process.env.EMAIL_USER}>`,
-        to:      process.env.PHARMACIST_EMAIL,
+        from: `"MediCare Pharmacy" <${process.env.EMAIL_USER}>`,
+        to: process.env.PHARMACIST_EMAIL,
         subject: '📋 New Prescription Uploaded',
         html: `
           <div style="font-family:Arial,sans-serif;padding:20px;">
@@ -81,7 +82,10 @@ export class PrescriptionsService {
         `,
       });
     } catch (emailErr) {
-      console.warn('Failed to send pharmacist email notification:', emailErr.message);
+      console.warn(
+        'Failed to send pharmacist email notification:',
+        emailErr.message,
+      );
     }
 
     return {

@@ -56,7 +56,7 @@ export class BlogController {
   async addComment(
     @Param('id') id: string,
     @Body('userName') userName: string,
-    @Body('text') text: string
+    @Body('text') text: string,
   ) {
     return await this.blogService.addComment(id, userName, text);
   }

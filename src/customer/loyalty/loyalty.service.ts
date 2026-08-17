@@ -30,85 +30,160 @@ export class LoyaltyService {
     private readonly aiService: AIService,
   ) {}
 
+  onModuleInit() {
+    this.startWatchers();
+  }
+
+  private startWatchers() {
+    const db = this.getDb();
+
+    // Watch new users registering from Mobile App
+    let isInitialUsersLoad = true;
+    db.collection('users').onSnapshot((snapshot) => {
+      if (isInitialUsersLoad) {
+        isInitialUsersLoad = false;
+        return;
+      }
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === 'added') {
+          const user = change.doc.data();
+          const uid = change.doc.id;
+
+          if (user.role === 'customer') {
+            const loyaltyDoc = await db
+              .collection('loyaltyCustomers')
+              .doc(uid)
+              .get();
+            if (!loyaltyDoc.exists) {
+              await db
+                .collection('loyaltyCustomers')
+                .doc(uid)
+                .set({
+                  uid,
+                  name: user.fullName || user.name || '',
+                  email: user.email || '',
+                  phone: user.phone || '',
+                  totalSpent: 0,
+                  totalPoints: 10,
+                  level: 'Silver',
+                  joinDate: user.createdAt || FieldValue.serverTimestamp(),
+                  lastPurchase: FieldValue.serverTimestamp(),
+                  purchaseCount: 0,
+                  averageOrderValue: 0,
+                  refillConsistency: 0,
+                  engagementScore: 50,
+                  predictedChurnRisk: 20,
+                  recommendedOffers: [],
+                  updatedAt: FieldValue.serverTimestamp(),
+                });
+            }
+          }
+        }
+      });
+    });
+
+    // Watch new orders placed from Mobile App (CustomerOrders)
+    let isInitialOrdersLoad = true;
+    db.collection('CustomerOrders').onSnapshot((snapshot) => {
+      if (isInitialOrdersLoad) {
+        isInitialOrdersLoad = false;
+        return;
+      }
+      snapshot.docChanges().forEach(async (change) => {
+        if (change.type === 'added') {
+          const order = change.doc.data();
+          const uid = order.userId;
+          if (uid && !uid.includes('@')) {
+            const orderAmount = Number(order.totalAmount || 0);
+            if (orderAmount > 0) {
+              await this.addPurchase(uid, orderAmount, change.doc.id);
+            }
+          }
+        }
+      });
+    });
+  }
+
   private getDb() {
     return this.firebaseService.getDb();
   }
 
+  private calculateLevel(points: number): 'Silver' | 'Gold' | 'Platinum' {
+    if (points >= 5000) return 'Platinum';
+    if (points >= 2000) return 'Gold';
+    return 'Silver';
+  }
+
   async getCustomerProfile(uid: string): Promise<LoyaltyCustomer | null> {
     const db = this.getDb();
-    const doc = await db.collection('loyaltyCustomers').doc(uid).get();
+
+    // 1. Fetch user doc for exact loyalty points (Single Source of Truth)
+    const userDoc = await db.collection('users').doc(uid).get();
+    const userData = userDoc.exists ? userDoc.data() : null;
+
+    // 2. Fetch orders for total spent / count
     const ordersProfile = await this.buildProfileFromOrders(uid);
+    const doc = await db.collection('loyaltyCustomers').doc(uid).get();
 
+    let profile: LoyaltyCustomer | null = null;
     if (ordersProfile) {
-      const data = doc.exists ? doc.data() : null;
-
-      if (!doc.exists || !data ||
-          Number(data.totalPoints || 0) !== ordersProfile.totalPoints ||
-          Number(data.totalSpent || 0) !== ordersProfile.totalSpent ||
-          data.level !== ordersProfile.level
-      ) {
-        await db.collection('loyaltyCustomers').doc(uid).set({
-          uid,
-          name: ordersProfile.name || data?.name || '',
-          email: ordersProfile.email || data?.email || '',
-          phone: ordersProfile.phone || data?.phone || '',
-          totalSpent: ordersProfile.totalSpent,
-          totalPoints: ordersProfile.totalPoints,
-          level: ordersProfile.level,
-          joinDate: ordersProfile.joinDate || (data?.joinDate?.toDate?.() || FieldValue.serverTimestamp()),
-          lastPurchase: ordersProfile.lastPurchase || (data?.lastPurchase?.toDate?.() || FieldValue.serverTimestamp()),
-          purchaseCount: ordersProfile.purchaseCount,
-          averageOrderValue: ordersProfile.averageOrderValue,
-          refillConsistency: data?.refillConsistency || ordersProfile.refillConsistency,
-          engagementScore: data?.engagementScore || ordersProfile.engagementScore,
-          predictedChurnRisk: data?.predictedChurnRisk || ordersProfile.predictedChurnRisk,
-          recommendedOffers: data?.recommendedOffers || ordersProfile.recommendedOffers,
-          birthday: data?.birthday || null,
-          updatedAt: FieldValue.serverTimestamp(),
-        }, { merge: true });
-      }
-
-      return {
-        ...ordersProfile,
-        recommendedOffers: data?.recommendedOffers || ordersProfile.recommendedOffers,
+      profile = { ...ordersProfile };
+    } else if (doc.exists) {
+      profile = { id: doc.id, ...doc.data() } as LoyaltyCustomer;
+    } else if (userData && userData.role === 'customer') {
+      profile = {
+        id: uid,
+        uid,
+        name: userData.fullName || userData.name || '',
+        email: userData.email || '',
+        phone: userData.phone || '',
+        totalSpent: 0,
+        totalPoints: 0,
+        level: 'Silver',
+        joinDate: userData.createdAt?.toDate?.() || new Date(),
+        lastPurchase: new Date(),
+        purchaseCount: 0,
+        averageOrderValue: 0,
+        refillConsistency: 0,
+        engagementScore: 50,
+        predictedChurnRisk: 20,
+        recommendedOffers: [],
       };
     }
 
-    if (doc.exists) {
-      const data = doc.data();
-      if (!data) return null;
-      let name = data.name || '';
-      let email = data.email || '';
-      if (!name || !email) {
-        const enriched = await this.getNameEmailFromOrders(uid);
-        name = name || enriched.name;
-        email = email || enriched.email;
+    if (profile && userData) {
+      // ALWAYS override points and level with what is in the users document!
+      if (userData.loyaltyPoints !== undefined) {
+        profile.totalPoints = Number(userData.loyaltyPoints);
+        if (profile.totalPoints >= 1000) profile.level = 'Platinum';
+        else if (profile.totalPoints >= 500) profile.level = 'Gold';
+        else profile.level = 'Silver';
       }
-      return {
-        id: doc.id,
-        uid: doc.id,
-        name,
-        email,
-        phone: data.phone || '',
-        totalSpent: data.totalSpent || 0,
-        totalPoints: data.totalPoints || 0,
-        level: data.level || 'Silver',
-        joinDate: data.joinDate?.toDate?.() || new Date(),
-        lastPurchase: data.lastPurchase?.toDate?.() || new Date(),
-        purchaseCount: data.purchaseCount || 0,
-        averageOrderValue: data.averageOrderValue || 0,
-        refillConsistency: data.refillConsistency || 0,
-        engagementScore: data.engagementScore || 50,
-        predictedChurnRisk: data.predictedChurnRisk || 0,
-        recommendedOffers: data.recommendedOffers || [],
-        birthday: data.birthday?.toDate?.(),
-      } as LoyaltyCustomer;
+      profile.name = userData.fullName || userData.name || profile.name;
+      profile.email = userData.email || profile.email;
+      profile.phone = userData.phone || profile.phone;
     }
 
-    return null;
+    if (profile) {
+      // Sync back to loyaltyCustomers
+      await db
+        .collection('loyaltyCustomers')
+        .doc(uid)
+        .set(
+          {
+            ...profile,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+    }
+
+    return profile;
   }
 
-  private async getNameEmailFromOrders(uid: string): Promise<{ name: string; email: string }> {
+  private async getNameEmailFromOrders(
+    uid: string,
+  ): Promise<{ name: string; email: string }> {
     try {
       const db = this.getDb();
       const snap = await db
@@ -124,7 +199,9 @@ export class LoyaltyService {
     return { name: '', email: '' };
   }
 
-  async getCustomerByEmailAndSync(email: string): Promise<LoyaltyCustomer | null> {
+  async getCustomerByEmailAndSync(
+    email: string,
+  ): Promise<LoyaltyCustomer | null> {
     const db = this.getDb();
 
     const ordersSnapshot = await db
@@ -138,14 +215,18 @@ export class LoyaltyService {
     }
 
     const orders = ordersSnapshot.docs.map((doc) => doc.data());
-    const totalSpent = orders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
-    const totalPoints = orders.reduce((sum, o) => sum + Math.floor(Number(o.totalAmount || 0)), 0);
+    const totalSpent = orders.reduce(
+      (sum, o) => sum + Number(o.totalAmount || 0),
+      0,
+    );
+    const totalPoints = 10 + Math.floor(totalSpent * 0.01);
     const purchaseCount = orders.length;
     const sorted = orders
       .map((o) => ({ ...o, createdAt: o.createdAt?.toDate?.() || new Date(0) }))
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
-    const uid = orders.find((o) => o.userId && !o.userId.includes('@'))?.userId || null;
+    const uid =
+      orders.find((o) => o.userId && !o.userId.includes('@'))?.userId || null;
     if (!uid) {
       console.warn(`No valid userId found for email ${email} — cannot sync`);
       return null;
@@ -159,29 +240,39 @@ export class LoyaltyService {
       const emailDocRef = db.collection('loyaltyCustomers').doc(email);
       const emailDoc = await emailDocRef.get();
       if (emailDoc.exists) {
-        console.log(`Consolidating duplicate entry: deleting email-keyed entry for ${email}`);
+        console.log(
+          `Consolidating duplicate entry: deleting email-keyed entry for ${email}`,
+        );
         await emailDocRef.delete();
       }
     }
 
-    await db.collection('loyaltyCustomers').doc(uid).set({
-      uid,
-      email,
-      name,
-      phone,
-      totalSpent,
-      totalPoints,
-      level,
-      joinDate: sorted[0]?.createdAt || FieldValue.serverTimestamp(),
-      lastPurchase: sorted[sorted.length - 1]?.createdAt || FieldValue.serverTimestamp(),
-      purchaseCount,
-      averageOrderValue: purchaseCount ? totalSpent / purchaseCount : 0,
-      refillConsistency: 0,
-      engagementScore: 50,
-      predictedChurnRisk: 20,
-      recommendedOffers: [],
-      updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
+    await db
+      .collection('loyaltyCustomers')
+      .doc(uid)
+      .set(
+        {
+          uid,
+          email,
+          name,
+          phone,
+          totalSpent,
+          totalPoints,
+          level,
+          joinDate: sorted[0]?.createdAt || FieldValue.serverTimestamp(),
+          lastPurchase:
+            sorted[sorted.length - 1]?.createdAt ||
+            FieldValue.serverTimestamp(),
+          purchaseCount,
+          averageOrderValue: purchaseCount ? totalSpent / purchaseCount : 0,
+          refillConsistency: 0,
+          engagementScore: 50,
+          predictedChurnRisk: 20,
+          recommendedOffers: [],
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
 
     return {
       id: uid,
@@ -205,14 +296,29 @@ export class LoyaltyService {
 
   async updateCustomerProfile(uid: string, updates: Partial<LoyaltyCustomer>) {
     const db = this.getDb();
-    await db.collection('loyaltyCustomers').doc(uid).set(
-      { ...updates, updatedAt: FieldValue.serverTimestamp() },
-      { merge: true },
-    );
+    await db
+      .collection('loyaltyCustomers')
+      .doc(uid)
+      .set(
+        { ...updates, updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+  }
+
+  async syncLoyaltyToUserDoc(uid: string, points: number, level: string) {
+    const db = this.getDb();
+    const userRef = db.collection('users').doc(uid);
+    const userDoc = await userRef.get();
+    if (userDoc.exists) {
+      await userRef.update({
+        loyaltyPoints: points,
+        loyaltyTier: level,
+      });
+    }
   }
 
   async calculatePoints(orderAmount: number): Promise<number> {
-    return Math.floor(orderAmount);
+    return Math.floor(orderAmount * 0.01);
   }
 
   async addPurchase(uid: string, orderAmount: number, orderId: string) {
@@ -222,23 +328,26 @@ export class LoyaltyService {
 
     if (!profile) {
       const { name, email } = await this.getNameEmailFromOrders(uid);
-      await db.collection('loyaltyCustomers').doc(uid).set({
-        uid,
-        name,
-        email,
-        totalSpent: orderAmount,
-        totalPoints: points,
-        level: this.calculateLevel(points),
-        joinDate: FieldValue.serverTimestamp(),
-        lastPurchase: FieldValue.serverTimestamp(),
-        purchaseCount: 1,
-        averageOrderValue: orderAmount,
-        refillConsistency: 0,
-        engagementScore: 50,
-        predictedChurnRisk: 20,
-        recommendedOffers: [],
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      await db
+        .collection('loyaltyCustomers')
+        .doc(uid)
+        .set({
+          uid,
+          name,
+          email,
+          totalSpent: orderAmount,
+          totalPoints: points,
+          level: this.calculateLevel(points),
+          joinDate: FieldValue.serverTimestamp(),
+          lastPurchase: FieldValue.serverTimestamp(),
+          purchaseCount: 1,
+          averageOrderValue: orderAmount,
+          refillConsistency: 0,
+          engagementScore: 50,
+          predictedChurnRisk: 20,
+          recommendedOffers: [],
+          updatedAt: FieldValue.serverTimestamp(),
+        });
     } else {
       const newTotalSpent = (profile.totalSpent || 0) + orderAmount;
       const newPurchaseCount = (profile.purchaseCount || 0) + 1;
@@ -263,13 +372,9 @@ export class LoyaltyService {
     });
   }
 
-  private calculateLevel(points: number): 'Silver' | 'Gold' | 'Platinum' {
-    if (points >= 5000) return 'Platinum';
-    if (points >= 2000) return 'Gold';
-    return 'Silver';
-  }
-
-  private async buildProfileFromOrders(uid: string): Promise<LoyaltyCustomer | null> {
+  private async buildProfileFromOrders(
+    uid: string,
+  ): Promise<LoyaltyCustomer | null> {
     const db = this.getDb();
     const ordersSnapshot = await db
       .collection('CustomerOrders')
@@ -279,8 +384,11 @@ export class LoyaltyService {
     if (ordersSnapshot.empty) return null;
 
     const orders = ordersSnapshot.docs.map((doc) => doc.data());
-    const totalSpent = orders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
-    const totalPoints = orders.reduce((sum, o) => sum + Math.floor(Number(o.totalAmount || 0)), 0);
+    const totalSpent = orders.reduce(
+      (sum, o) => sum + Number(o.totalAmount || 0),
+      0,
+    );
+    const totalPoints = Math.floor(totalSpent * 0.01);
     const purchaseCount = orders.length;
     const sorted = orders
       .map((o) => ({ ...o, createdAt: o.createdAt?.toDate?.() || new Date(0) }))
@@ -309,15 +417,18 @@ export class LoyaltyService {
   private async buildOrdersCustomerMap() {
     const db = this.getDb();
     const snapshot = await db.collection('CustomerOrders').get();
-    const orderMap = new Map<string, {
-      totalSpent: number;
-      totalPoints: number;
-      purchaseCount: number;
-      level: 'Silver' | 'Gold' | 'Platinum';
-      name: string;
-      email: string;
-      phone: string;
-    }>();
+    const orderMap = new Map<
+      string,
+      {
+        totalSpent: number;
+        totalPoints: number;
+        purchaseCount: number;
+        level: 'Silver' | 'Gold' | 'Platinum';
+        name: string;
+        email: string;
+        phone: string;
+      }
+    >();
 
     snapshot.docs.forEach((doc) => {
       const data = doc.data();
@@ -336,7 +447,7 @@ export class LoyaltyService {
       };
 
       existing.totalSpent += Number(data.totalAmount || 0);
-      existing.totalPoints += Math.floor(Number(data.totalAmount || 0));
+      existing.totalPoints += Math.floor(Number(data.totalAmount || 0) * 0.01);
       existing.purchaseCount += 1;
       existing.level = this.calculateLevel(existing.totalPoints);
       existing.name = existing.name || data.customerName || '';
@@ -355,12 +466,17 @@ export class LoyaltyService {
     // Single source of truth: CustomerOrders
     const ordersMap = await this.buildOrdersCustomerMap();
 
-    const customers: LoyaltyCustomer[] = await Promise.all(
-      Array.from(ordersMap.entries()).map(async ([uid, orderData]) => {
-        const userDoc = await db.collection('users').doc(uid).get();
-        const userData = userDoc.exists ? userDoc.data() : null;
+    // Fetch all users at once instead of making N parallel queries
+    const usersSnapshot = await db.collection('users').get();
+    const usersMap = new Map();
+    usersSnapshot.docs.forEach((doc) => usersMap.set(doc.id, doc.data()));
 
-        const name = userData?.fullName || userData?.name || orderData.name || '';
+    const customers: LoyaltyCustomer[] = Array.from(ordersMap.entries()).map(
+      ([uid, orderData]) => {
+        const userData = usersMap.get(uid) || null;
+
+        const name =
+          userData?.fullName || userData?.name || orderData.name || '';
         const email = userData?.email || orderData.email || '';
 
         return {
@@ -382,8 +498,8 @@ export class LoyaltyService {
           engagementScore: 50,
           predictedChurnRisk: 20,
           recommendedOffers: [],
-        } as LoyaltyCustomer;
-      }),
+        };
+      },
     );
 
     const deduped = new Map<string, LoyaltyCustomer>();
@@ -406,20 +522,31 @@ export class LoyaltyService {
     try {
       const loyaltySnapshot = await db.collection('loyaltyCustomers').get();
       const ordersMap = await this.buildOrdersCustomerMap();
-      const customerMap = new Map<string, {
-        totalSpent: number;
-        totalPoints: number;
-        purchaseCount: number;
-        level: 'Silver' | 'Gold' | 'Platinum';
-      }>();
+      const customerMap = new Map<
+        string,
+        {
+          totalSpent: number;
+          totalPoints: number;
+          purchaseCount: number;
+          level: 'Silver' | 'Gold' | 'Platinum';
+        }
+      >();
 
       loyaltySnapshot.docs.forEach((doc) => {
         const data = doc.data();
         const orderData = ordersMap.get(doc.id);
-        const totalSpent = orderData ? orderData.totalSpent : Number(data.totalSpent || 0);
-        const totalPoints = orderData ? orderData.totalPoints : Number(data.totalPoints || 0);
-        const purchaseCount = orderData ? orderData.purchaseCount : Number(data.purchaseCount || 0);
-        const level = orderData ? orderData.level : ((data.level as 'Silver' | 'Gold' | 'Platinum') || 'Silver');
+        const totalSpent = orderData
+          ? orderData.totalSpent
+          : Number(data.totalSpent || 0);
+        const totalPoints = orderData
+          ? orderData.totalPoints
+          : Number(data.totalPoints || 0);
+        const purchaseCount = orderData
+          ? orderData.purchaseCount
+          : Number(data.purchaseCount || 0);
+        const level = orderData
+          ? orderData.level
+          : (data.level as 'Silver' | 'Gold' | 'Platinum') || 'Silver';
 
         customerMap.set(doc.id, {
           totalSpent,
@@ -495,6 +622,14 @@ export class LoyaltyService {
   async syncFromOrders() {
     const db = this.getDb();
     const ordersSnapshot = await db.collection('CustomerOrders').get();
+    const dispensedSnapshot = await db.collection('pharmacistDispensed').get();
+    const usersSnapshot = await db.collection('users').get();
+
+    const emailToUid = new Map<string, string>();
+    usersSnapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      if (data.email) emailToUid.set(data.email.toLowerCase(), doc.id);
+    });
 
     await this.cleanupEmailKeyedLoyaltyDocs();
 
@@ -502,18 +637,51 @@ export class LoyaltyService {
     for (const orderDoc of ordersSnapshot.docs) {
       const order = orderDoc.data();
       const uid = order.userId;
-      if (!uid || uid.includes('@')) {
-        console.warn(`Skipping order ${orderDoc.id} — invalid userId: "${uid}"`);
-        continue;
-      }
+      if (!uid || uid.includes('@')) continue;
       if (!ordersByUser[uid]) ordersByUser[uid] = [];
-      ordersByUser[uid].push({ id: orderDoc.id, ...order });
+      ordersByUser[uid].push({
+        id: orderDoc.id,
+        ...order,
+        totalAmount: Number(order.totalAmount || 0),
+      });
     }
 
-    for (const [uid, orders] of Object.entries(ordersByUser)) {
-      const totalSpent = orders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+    for (const doc of dispensedSnapshot.docs) {
+      const dispense = doc.data();
+      if (dispense.paymentStatus === 'paid' || dispense.total) {
+        const email = dispense.patientEmail;
+        if (email) {
+          const uid = emailToUid.get(email.toLowerCase());
+          if (uid) {
+            if (!ordersByUser[uid]) ordersByUser[uid] = [];
+            ordersByUser[uid].push({
+              id: doc.id,
+              ...dispense,
+              totalAmount: Number(dispense.total || 0),
+              createdAt: dispense.createdAt || FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+    }
+
+    usersSnapshot.docs.forEach((doc) => {
+      if (!ordersByUser[doc.id]) ordersByUser[doc.id] = [];
+    });
+
+    const entries = Object.entries(ordersByUser);
+    const BATCH_SIZE = 400; // Keep under 500 to be safe
+    let batch = db.batch();
+    let operationCount = 0;
+
+    for (let i = 0; i < entries.length; i++) {
+      const [uid, orders] = entries[i];
+      const totalSpent = orders.reduce(
+        (sum, o) => sum + Number(o.totalAmount || 0),
+        0,
+      );
       const purchaseCount = orders.length;
-      const totalPoints = Math.floor(totalSpent);
+      const totalPoints = 10 + Math.floor(totalSpent * 0.01);
       const level = this.calculateLevel(totalPoints);
 
       const sorted = [...orders].sort((a, b) => {
@@ -522,41 +690,87 @@ export class LoyaltyService {
         return bTime.getTime() - aTime.getTime();
       });
 
-      const latest = sorted[0];
-      const oldest = sorted[sorted.length - 1];
+      const latest = sorted.length > 0 ? sorted[0] : null;
+      const oldest = sorted.length > 0 ? sorted[sorted.length - 1] : null;
+      const userDoc =
+        usersSnapshot.docs.find((d) => d.id === uid)?.data() || {};
 
-      await db.collection('loyaltyCustomers').doc(uid).set({
-        uid,
-        name: latest.customerName || latest.name || '',
-        email: latest.email || '',
-        phone: latest.phone || '',
-        totalSpent,
-        totalPoints,
-        level,
-        joinDate: oldest.createdAt || FieldValue.serverTimestamp(),
-        lastPurchase: latest.createdAt || FieldValue.serverTimestamp(),
-        purchaseCount,
-        averageOrderValue: purchaseCount ? totalSpent / purchaseCount : 0,
-        refillConsistency: 0,
-        engagementScore: 50,
-        predictedChurnRisk: 20,
-        recommendedOffers: [],
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
+      const loyaltyRef = db.collection('loyaltyCustomers').doc(uid);
+      batch.set(
+        loyaltyRef,
+        {
+          uid,
+          name: latest?.customerName || latest?.name || userDoc.fullName || '',
+          email: latest?.email || userDoc.email || '',
+          phone: latest?.phone || userDoc.phone || '',
+          totalSpent,
+          totalPoints,
+          level,
+          joinDate:
+            oldest?.createdAt ||
+            userDoc.createdAt ||
+            FieldValue.serverTimestamp(),
+          lastPurchase: latest?.createdAt || FieldValue.serverTimestamp(),
+          purchaseCount,
+          averageOrderValue: purchaseCount ? totalSpent / purchaseCount : 0,
+          refillConsistency: 0,
+          engagementScore: 50,
+          predictedChurnRisk: 20,
+          recommendedOffers: [],
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      operationCount++;
+
+      const userRef = db.collection('users').doc(uid);
+      batch.update(userRef, {
+        loyaltyPoints: totalPoints,
+        loyaltyTier: level,
+      });
+      operationCount++;
+
+      if (operationCount >= BATCH_SIZE) {
+        await batch.commit();
+        batch = db.batch();
+        operationCount = 0;
+      }
     }
 
-    return { success: true, synced: Object.keys(ordersByUser).length };
+    if (operationCount > 0) {
+      await batch.commit();
+    }
+
+    return { success: true, synced: entries.length };
   }
 
   private async cleanupEmailKeyedLoyaltyDocs() {
     const db = this.getDb();
     const snapshot = await db.collection('loyaltyCustomers').get();
 
+    let batch = db.batch();
+    let operationCount = 0;
+    const BATCH_SIZE = 400;
+
     for (const doc of snapshot.docs) {
       if (doc.id.includes('@')) {
-        await doc.ref.delete();
-        console.log('Deleted stale email-keyed loyalty entry:', doc.id);
+        batch.delete(doc.ref);
+        operationCount++;
+        console.log(
+          'Queued delete for stale email-keyed loyalty entry:',
+          doc.id,
+        );
+
+        if (operationCount >= BATCH_SIZE) {
+          await batch.commit();
+          batch = db.batch();
+          operationCount = 0;
+        }
       }
+    }
+
+    if (operationCount > 0) {
+      await batch.commit();
     }
   }
 
@@ -592,15 +806,32 @@ export class LoyaltyService {
       if (key === email) {
         const correctUid = emailToUid.get(email);
         if (correctUid && correctUid !== key && entries.has(correctUid)) {
-          console.log(`Found duplicate: ${email} - deleting email-keyed entry, keeping uid=${correctUid}`);
+          console.log(
+            `Found duplicate: ${email} - deleting email-keyed entry, keeping uid=${correctUid}`,
+          );
           toDelete.push(key);
         }
       }
     }
 
+    let batch = db.batch();
+    let operationCount = 0;
+    const BATCH_SIZE = 400;
+
     for (const key of toDelete) {
-      await db.collection('loyaltyCustomers').doc(key).delete();
-      console.log(`Deleted duplicate email-keyed entry: ${key}`);
+      batch.delete(db.collection('loyaltyCustomers').doc(key));
+      operationCount++;
+      console.log(`Queued delete for duplicate email-keyed entry: ${key}`);
+
+      if (operationCount >= BATCH_SIZE) {
+        await batch.commit();
+        batch = db.batch();
+        operationCount = 0;
+      }
+    }
+
+    if (operationCount > 0) {
+      await batch.commit();
     }
 
     return {

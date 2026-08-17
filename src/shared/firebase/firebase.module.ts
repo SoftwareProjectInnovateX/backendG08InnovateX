@@ -4,7 +4,7 @@ import { FirebaseService } from './firebase.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),  // ← add this
+    ConfigModule.forRoot({ isGlobal: true }), // ← add this
   ],
   providers: [FirebaseService],
   exports: [FirebaseService],

@@ -14,31 +14,31 @@ export class BrandsService {
       return this.cache.data;
     }
 
-    const db       = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     const snapshot = await db
       .collection('brands')
       .orderBy('createdAt', 'desc')
       .get();
 
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
     this.cache = { data, ts: Date.now() };
     return data;
   }
 
   async addBrand(body: any) {
-    const db   = this.firebaseService.getDb();
+    const db = this.firebaseService.getDb();
     this.cache = null; // invalidate cache so next GET is fresh
     const docRef = await db.collection('brands').add({
-      name:        body.name,
-      tagline:     body.tagline        || '',
+      name: body.name,
+      tagline: body.tagline || '',
       description: body.description,
-      category:    body.category,
-      imageUrl:    body.imageUrl       || '',
-      rating:      Number(body.rating)      || 0,
-      products:    Number(body.products)    || 0,
+      category: body.category,
+      imageUrl: body.imageUrl || '',
+      rating: Number(body.rating) || 0,
+      products: Number(body.products) || 0,
       established: Number(body.established) || 0,
-      country:     body.country        || '',
-      createdAt:   FieldValue.serverTimestamp(),
+      country: body.country || '',
+      createdAt: FieldValue.serverTimestamp(),
     });
     return { success: true, id: docRef.id };
   }

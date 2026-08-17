@@ -22,7 +22,6 @@ export class OrdersController {
 
   @Post()
   async create(@Body() orderData: any) {
-    
     return await this.ordersService.createOrder(orderData);
   }
 }

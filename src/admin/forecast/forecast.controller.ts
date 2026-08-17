@@ -10,7 +10,6 @@ export class ForecastController {
     return this.forecastService.getForecast();
   }
 
- 
   @Get('insight/:productId')
   async getInsight(@Param('productId') productId: string) {
     return this.forecastService.getAiInsight(productId);

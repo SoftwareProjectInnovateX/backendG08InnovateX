@@ -16,13 +16,17 @@ export class AppController {
 
   @Get('set-admin')
   async setAdmin() {
-    await this.firebaseService.getAdmin().setCustomUserClaims('r0xXWdAeqGagF3MSCGc9pXcghu73', { role: 'admin' });
+    await this.firebaseService
+      .getAdmin()
+      .setCustomUserClaims('r0xXWdAeqGagF3MSCGc9pXcghu73', { role: 'admin' });
     return { success: true };
   }
 
   @Get('check-admin')
   async checkAdmin() {
-    const user = await this.firebaseService.getAdmin().getUser('r0xXWdAeqGagF3MSCGc9pXcghu73');
+    const user = await this.firebaseService
+      .getAdmin()
+      .getUser('r0xXWdAeqGagF3MSCGc9pXcghu73');
     return { customClaims: user.customClaims };
   }
 }

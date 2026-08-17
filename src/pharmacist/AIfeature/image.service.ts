@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class ImageService {
-  async generateImage(name: string, category?: string): Promise<{ imageUrl: string }> {
+  async generateImage(
+    name: string,
+    category?: string,
+  ): Promise<{ imageUrl: string }> {
     const query = `${name} ${category} medicine product`;
 
     const url = `https://serpapi.com/search.json?engine=google_images&q=${encodeURIComponent(query)}&api_key=${process.env.SERPAPI_KEY}&num=1`;
