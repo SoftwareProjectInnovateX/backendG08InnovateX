@@ -1,11 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import {
-  AnalyseInvoicesDto,
-  InvoiceRecord,
-  GenerateSummaryPdfDto,
-  GenerateBusinessAdvisorDto,
-} from './dto/ai-analytics.dto.js';
+import { AnalyseInvoicesDto, InvoiceRecord, GenerateSummaryPdfDto, GenerateBusinessAdvisorDto } from './dto/ai-analytics.dto.js';
 
 function groupBy<T>(arr: T[], key: (item: T) => string): Record<string, T[]> {
   return arr.reduce(
@@ -43,6 +38,23 @@ function expandInvoiceItems(
   });
 }
 
+interface ProductAnalyticsRecord extends InvoiceRecord {
+  productName: string;
+  totalAmount: number;
+}
+
+function expandInvoiceItems(invoices: InvoiceRecord[]): ProductAnalyticsRecord[] {
+  return invoices.flatMap((inv) => {
+    if (!inv.items?.length) return [{ ...inv }];
+
+    return inv.items.map((item) => ({
+      ...inv,
+      productName: item.productName,
+      totalAmount: Math.max(0, item.quantity) * Math.max(0, item.unitPrice),
+    }));
+  });
+}
+
 /* ── PDF layout constants (used only by generateSummaryPdf) ── */
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
@@ -65,50 +77,44 @@ export class AiAnalyticsService {
     const productRecords = expandInvoiceItems(dto.invoices);
     const grouped = groupBy(productRecords, (inv) => inv.productName);
 
-    const recommendations = Object.entries(grouped).map(
-      ([productName, invs]) => {
-        const paidInvs = invs.filter((i) => i.paymentStatus === 'Paid');
-        const pendingInvs = invs.filter((i) => i.paymentStatus === 'Pending');
-        const overdueInvs = invs.filter((i) => i.paymentStatus === 'Overdue');
+    const recommendations = Object.entries(grouped).map(([productName, invs]) => {
+      const paidInvs    = invs.filter((i) => i.paymentStatus === 'Paid');
+      const pendingInvs = invs.filter((i) => i.paymentStatus === 'Pending');
+      const overdueInvs = invs.filter((i) => i.paymentStatus === 'Overdue');
 
-        const totalValue = invs.reduce((s, i) => s + i.totalAmount, 0);
-        const avgOrderValue = totalValue / invs.length;
-        const paymentRate = Math.round((paidInvs.length / invs.length) * 100);
+      const totalValue    = invs.reduce((s, i) => s + i.totalAmount, 0);
+      const avgOrderValue = totalValue / invs.length;
+      const paymentRate   = Math.round((paidInvs.length / invs.length) * 100);
 
-        const sortedDates = invs
-          .map((i) => i.invoiceDate)
-          .sort()
-          .reverse();
-        const daysSinceLast = sortedDates[0]
-          ? daysBetween(sortedDates[0], new Date().toISOString().split('T')[0])
-          : 999;
+      const sortedDates = invs.map((i) => i.invoiceDate).sort().reverse();
+      const daysSinceLast = sortedDates[0]
+        ? daysBetween(sortedDates[0], new Date().toISOString().split('T')[0])
+        : 999;
 
-        let score = 0;
-        if (invs.length >= 5) score += 20;
-        if (invs.length >= 3) score += 10;
-        if (paymentRate >= 80) score += 25;
-        if (daysSinceLast <= 30) score += 20;
-        if (overdueInvs.length > 0) score -= 10;
-        if (pendingInvs.length > 0) score -= 5;
+      let score = 0;
+      if (invs.length >= 5)       score += 20;
+      if (invs.length >= 3)       score += 10;
+      if (paymentRate >= 80)      score += 25;
+      if (daysSinceLast <= 30)    score += 20;
+      if (overdueInvs.length > 0) score -= 10;
+      if (pendingInvs.length > 0) score -= 5;
 
-        let urgency: string;
-        let reason: string;
+      let urgency: string;
+      let reason: string;
 
-        if (score >= 55 && daysSinceLast <= 14) {
-          urgency = 'urgent';
-          reason = `High demand product with ${invs.length} invoices. Last order ${daysSinceLast} days ago. Payment rate ${paymentRate}%.`;
-        } else if (score >= 40) {
-          urgency = 'supply';
-          reason = `Consistent order history (${invs.length} invoices). ${paymentRate}% payment rate. Consider replenishing soon.`;
-        } else if (score >= 20) {
-          urgency = 'monitor';
-          reason = `Moderate order frequency. Monitor demand before committing to a supply run.`;
-        } else {
-          urgency = 'none';
-          reason = `Low order frequency or poor payment history. No immediate action needed.`;
-        }
-
-        const confidence = Math.min(95, Math.max(30, score + 35));
+      if (score >= 55 && daysSinceLast <= 14) {
+        urgency = 'urgent';
+        reason  = `High demand product with ${invs.length} invoices. Last order ${daysSinceLast} days ago. Payment rate ${paymentRate}%.`;
+      } else if (score >= 40) {
+        urgency = 'supply';
+        reason  = `Consistent order history (${invs.length} invoices). ${paymentRate}% payment rate. Consider replenishing soon.`;
+      } else if (score >= 20) {
+        urgency = 'monitor';
+        reason  = `Moderate order frequency. Monitor demand before committing to a supply run.`;
+      } else {
+        urgency = 'none';
+        reason  = `Low order frequency or poor payment history. No immediate action needed.`;
+      }
 
         return {
           productName,
@@ -133,10 +139,7 @@ export class AiAnalyticsService {
     const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const forecasts = Object.entries(grouped)
-      .filter(
-        ([, invs]) =>
-          new Set(invs.map((inv) => inv.invoiceDate.slice(0, 7))).size >= 3,
-      )
+      .filter(([, invs]) => new Set(invs.map((inv) => inv.invoiceDate.slice(0, 7))).size >= 3)
       .map(([productName, invs]) => {
         const byMonth: Record<string, number> = {};
         invs.forEach((inv) => {
@@ -211,12 +214,8 @@ export class AiAnalyticsService {
         : 0;
       const pharmacyStat = pharmacyStats[inv.pharmacy] ?? { total: 1, late: 0 };
       const historicalTotal = Math.max(0, pharmacyStat.total - 1);
-      const historicalLate = Math.max(
-        0,
-        pharmacyStat.late - (inv.paymentStatus === 'Overdue' ? 1 : 0),
-      );
-      const lateRate =
-        historicalTotal > 0 ? historicalLate / historicalTotal : 0;
+      const historicalLate = Math.max(0, pharmacyStat.late - (inv.paymentStatus === 'Overdue' ? 1 : 0));
+      const lateRate = historicalTotal > 0 ? historicalLate / historicalTotal : 0;
 
       let riskScore = 0;
       riskScore += Math.min(40, daysOverdue * 2);
@@ -238,13 +237,12 @@ export class AiAnalyticsService {
 
       return {
         invoiceNumber: inv.id.slice(0, 12).toUpperCase(),
-        productName: inv.productName,
-        pharmacy: inv.pharmacy,
-        amount: inv.totalAmount,
-        dueDate: inv.dueDate,
+        productName:   inv.productName,
+        pharmacy:      inv.pharmacy,
+        amount:        inv.totalAmount,
+        dueDate:       inv.dueDate,
         daysOverdue,
-        riskScore,
-        riskLevel,
+        riskScore, riskLevel,
         reason: reason.trim(),
       };
     });
@@ -370,7 +368,7 @@ Use a maximum of 3 priority actions and 2 watch items. If there is nothing impor
         throw new Error(`Groq API returned HTTP ${response.status}`);
       }
 
-      const data = (await response.json()) as {
+      const data = await response.json() as {
         choices?: Array<{ message?: { content?: string } }>;
       };
 
