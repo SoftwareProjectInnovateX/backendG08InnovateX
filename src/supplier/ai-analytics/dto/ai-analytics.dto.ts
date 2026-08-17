@@ -90,3 +90,15 @@ export class GenerateBusinessAdvisorDto {
   paymentRisk!: PaymentRiskItem[];
   restockSuggestions!: RestockSuggestion[];
 }
+
+/* ── POST /ai/business-advisor ── */
+
+export class GenerateBusinessAdvisorDto {
+  supplierId!: string;
+  invoiceCount!: number;
+
+  supplyRecommendations!: SupplyRecommendation[];
+  demandForecast!: DemandForecastItem[];
+  paymentRisk!: PaymentRiskItem[];
+  restockSuggestions!: RestockSuggestion[];
+}

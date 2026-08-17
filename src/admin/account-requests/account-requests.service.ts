@@ -154,10 +154,7 @@ export class AccountRequestsService {
         tempPassword,
       });
     } catch (mailError) {
-      console.error(
-        '[AccountRequests] Approval email failed (account still created):',
-        mailError,
-      );
+      console.error('[AccountRequests] Approval email failed (account still created):', mailError);
     }
 
     return {
@@ -192,10 +189,7 @@ export class AccountRequestsService {
         role: request.type,
       });
     } catch (mailError) {
-      console.error(
-        '[AccountRequests] Rejection email failed (status still updated):',
-        mailError,
-      );
+      console.error('[AccountRequests] Rejection email failed (status still updated):', mailError);
     }
 
     return {

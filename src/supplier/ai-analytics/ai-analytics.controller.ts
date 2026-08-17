@@ -17,7 +17,9 @@ import {
 
 @Controller('ai')
 export class AiAnalyticsController {
-  constructor(private readonly aiAnalyticsService: AiAnalyticsService) {}
+  constructor(
+    private readonly aiAnalyticsService: AiAnalyticsService,
+  ) {}
 
   @Post('supply-recommendations')
   supplyRecommendations(@Body() dto: AnalyseInvoicesDto) {
@@ -42,7 +44,9 @@ export class AiAnalyticsController {
   // Groq-powered business advisor
   @Post('business-advisor')
   @HttpCode(HttpStatus.OK)
-  async businessAdvisor(@Body() dto: GenerateBusinessAdvisorDto) {
+  async businessAdvisor(
+    @Body() dto: GenerateBusinessAdvisorDto,
+  ) {
     return await this.aiAnalyticsService.businessAdvisor(dto);
   }
 
@@ -52,13 +56,17 @@ export class AiAnalyticsController {
     @Body() dto: GenerateSummaryPdfDto,
     @Res() res: Response,
   ) {
-    const pdfBuffer = await this.aiAnalyticsService.generateSummaryPdf(dto);
+    const pdfBuffer =
+      await this.aiAnalyticsService.generateSummaryPdf(dto);
 
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="AI-Analytics-Summary-${
-        new Date(dto.generatedAt).toISOString().split('T')[0]
-      }.pdf"`,
+      'Content-Disposition':
+        `attachment; filename="AI-Analytics-Summary-${
+          new Date(dto.generatedAt)
+            .toISOString()
+            .split('T')[0]
+        }.pdf"`,
       'Content-Length': pdfBuffer.length,
     });
 
