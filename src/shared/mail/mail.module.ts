@@ -11,8 +11,8 @@ import { MailService } from './mail.service.js';
       useFactory: (config: ConfigService) => ({
         transport: {
           host: 'smtp.gmail.com',
-          port: 465,
-          secure: true,
+          port: 587,
+          secure: false,
           auth: {
             user: config.get<string>('MAIL_USER'),
             pass: config.get<string>('MAIL_PASS'),

@@ -146,12 +146,16 @@ export class AccountRequestsService {
       approvedAt: FieldValue.serverTimestamp(),
     });
 
-    await this.mailService.sendApprovalEmail({
-      to: request.email,
-      name: request.companyName ?? request.fullName ?? '',
-      role: request.type,
-      tempPassword,
-    });
+    try {
+      await this.mailService.sendApprovalEmail({
+        to: request.email,
+        name: request.companyName ?? request.fullName ?? '',
+        role: request.type,
+        tempPassword,
+      });
+    } catch (mailError) {
+      console.error('[AccountRequests] Approval email failed (account still created):', mailError);
+    }
 
     return {
       success: true,
@@ -178,11 +182,15 @@ export class AccountRequestsService {
     });
 
     // 2. Send rejection email
-    await this.mailService.sendRejectionEmail({
-      to: request.email,
-      name: request.companyName ?? request.fullName ?? '',
-      role: request.type,
-    });
+    try {
+      await this.mailService.sendRejectionEmail({
+        to: request.email,
+        name: request.companyName ?? request.fullName ?? '',
+        role: request.type,
+      });
+    } catch (mailError) {
+      console.error('[AccountRequests] Rejection email failed (status still updated):', mailError);
+    }
 
     return {
       success: true,
