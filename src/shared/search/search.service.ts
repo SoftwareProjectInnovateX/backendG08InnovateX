@@ -47,6 +47,48 @@ export class SearchService implements OnModuleInit {
       'Xenova/all-MiniLM-L6-v2',
     );
     console.log('✅ Embedding model loaded');
+
+    // Run existing products migration to lowercase names in background
+    this.migrateExistingProductsLowercase().catch((err) => {
+      console.error('❌ Migration failed to complete:', err);
+    });
+  }
+
+  private async migrateExistingProductsLowercase(): Promise<void> {
+    try {
+      const db = this.firebaseService.getDb();
+      const batch = db.batch();
+      let migratedCount = 0;
+
+      // Migrate pharmacistProducts
+      const pharmSnap = await db.collection('pharmacistProducts').get();
+      for (const doc of pharmSnap.docs) {
+        const data = doc.data();
+        if (data.name && data.nameLowercase === undefined) {
+          batch.update(doc.ref, { nameLowercase: data.name.toLowerCase() });
+          migratedCount++;
+        }
+      }
+
+      // Migrate public products
+      const publicSnap = await db.collection('products').get();
+      for (const doc of publicSnap.docs) {
+        const data = doc.data();
+        if (data.name && data.nameLowercase === undefined) {
+          batch.update(doc.ref, { nameLowercase: data.name.toLowerCase() });
+          migratedCount++;
+        }
+      }
+
+      if (migratedCount > 0) {
+        await batch.commit();
+        console.log(`✅ Migrated ${migratedCount} existing products to have nameLowercase`);
+      } else {
+        console.log('✅ No products needed lowercase name migration');
+      }
+    } catch (error) {
+      console.error('❌ Failed to migrate existing products to lowercase name:', error);
+    }
   }
 
   async getEmbedding(text: string): Promise<number[]> {
@@ -104,11 +146,12 @@ export class SearchService implements OnModuleInit {
     try {
       const db = this.firebaseService.getDb();
 
-      // Prefix search on name (case-sensitive)
+      // Prefix range query using lowercase name to achieve case-insensitivity
+      const lowercaseQuery = query.toLowerCase();
       const snapshot = await db
         .collection('pharmacistProducts')
-        .where('name', '>=', query)
-        .where('name', '<=', query + '\uf8ff')
+        .where('nameLowercase', '>=', lowercaseQuery)
+        .where('nameLowercase', '<=', lowercaseQuery + '\uf8ff')
         .limit(20)
         .get();
 

@@ -75,6 +75,7 @@ export class ProductsService {
 
     const productPayload: any = {
       name: body.name,
+      nameLowercase: body.name ? body.name.toLowerCase() : '',
       price: Number(body.price),
       description: body.description ?? '',
       imageUrl: body.imageUrl ?? '',
@@ -120,6 +121,7 @@ export class ProductsService {
     if (visibility === 'customer') {
       const publicProductPayload: any = {
         name: body.name,
+        nameLowercase: body.name ? body.name.toLowerCase() : '',
         price: Number(body.price),
         description: body.description ?? '',
         imageUrl: body.imageUrl ?? '',
