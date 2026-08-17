@@ -68,7 +68,7 @@ RULES — follow strictly:
       ];
 
       const response = await this.groq.chat.completions.create({
-        model: 'llama-3.3-70b-specdec',
+        model: 'groq/compound',
         messages,
         max_tokens: 500,
       });

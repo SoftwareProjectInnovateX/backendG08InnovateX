@@ -60,7 +60,7 @@ describe('ChatService', () => {
 
       // Verify completion parameters
       const callArgs = mockCreate.mock.calls[0][0];
-      expect(callArgs.model).toBe('llama-3.3-70b-specdec');
+      expect(callArgs.model).toBe('groq/compound');
       expect(callArgs.max_tokens).toBe(500);
 
       // Verify system prompt is passed
