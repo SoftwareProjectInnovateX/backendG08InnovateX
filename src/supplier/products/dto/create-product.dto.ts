@@ -40,4 +40,8 @@ export class CreateProductDto {
   @IsString()
   @IsOptional()
   manufacturer?: string;
+
+  @IsString()
+  @IsOptional()
+  expireDate?: string;
 }
