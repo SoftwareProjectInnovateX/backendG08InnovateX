@@ -53,7 +53,16 @@ export interface ForecastResult {
   isExpired: boolean;
 }
 
+export interface AiInsightResult {
+  insight: string;
+  source: 'ai' | 'fallback';
+}
+
 const COMPLETED_STATUSES = ['Paid', 'paid', 'PAID', 'delivered', 'completed'];
+
+// Keep this in sync with AiAnalyticsService's GROQ_MODEL default so both
+// services move together if Groq deprecates the model again.
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 @Injectable()
 export class ForecastService {
@@ -76,15 +85,9 @@ export class ForecastService {
         dailySales: new Array(7).fill(0),
       };
 
-      const { forecast7d, forecast30d, dailyAvg } = this.predictDemand(
-        sales.dailySales,
-      );
+      const { forecast7d, forecast30d, dailyAvg } = this.predictDemand(sales.dailySales);
 
-      const risk = this.calculateStockRisk(
-        product.stock,
-        forecast7d,
-        product.minStock,
-      );
+      const risk = this.calculateStockRisk(product.stock, forecast7d, product.minStock);
 
       const daysUntilStockout =
         dailyAvg > 0 ? Math.floor(product.stock / dailyAvg) : null;
@@ -120,9 +123,7 @@ export class ForecastService {
     const today = new Date().toISOString().split('T')[0];
 
     for (const item of results) {
-      const ref = db
-        .collection('salesForecasts')
-        .doc(`${today}_${item.productId}`);
+      const ref = db.collection('salesForecasts').doc(`${today}_${item.productId}`);
       batch.set(ref, { ...item, generatedAt: new Date() });
     }
 
@@ -141,7 +142,7 @@ export class ForecastService {
       .get();
 
     return snapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }) as CustomerOrder)
+      .map((doc) => ({ id: doc.id, ...doc.data() } as CustomerOrder))
       .filter(
         (order) =>
           COMPLETED_STATUSES.includes(order.orderStatus ?? '') ||
@@ -240,11 +241,11 @@ export class ForecastService {
     return 'Stock levels are healthy and sufficient for forecasted demand.';
   }
 
-  async getAiInsight(productId: string): Promise<{ insight: string }> {
+  async getAiInsight(productId: string): Promise<AiInsightResult> {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
       this.logger.error('GROQ_API_KEY is not set in environment variables');
-      return { insight: 'AI insight unavailable: missing API key.' };
+      return { insight: 'AI insight unavailable: missing API key.', source: 'fallback' };
     }
 
     let product: ForecastResult | undefined;
@@ -257,7 +258,7 @@ export class ForecastService {
     }
 
     if (!product) {
-      return { insight: 'Product not found.' };
+      return { insight: 'Product not found.', source: 'fallback' };
     }
 
     const prompt = `
@@ -284,7 +285,7 @@ Maximum 2 sentences.
       });
 
       const completion = await client.chat.completions.create({
-        model: 'openai/gpt-oss-20b',
+        model: GROQ_MODEL,
         messages: [
           {
             role: 'user',
@@ -295,15 +296,20 @@ Maximum 2 sentences.
         max_tokens: 100,
       });
 
+      const content = completion.choices[0]?.message?.content?.trim();
+
       return {
-        insight:
-          completion.choices[0]?.message?.content?.trim() ??
-          this.generateFallbackInsight(product),
+        insight: content ?? this.generateFallbackInsight(product),
+        source: content ? 'ai' : 'fallback',
       };
     } catch (err: any) {
-      this.logger.error('Groq API call failed', err?.message ?? err);
+      this.logger.error(
+        'Groq API call failed',
+        err?.response?.data ?? err?.error ?? err?.message ?? err,
+      );
       return {
         insight: this.generateFallbackInsight(product),
+        source: 'fallback',
       };
     }
   }
