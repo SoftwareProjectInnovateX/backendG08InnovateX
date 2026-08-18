@@ -1,4 +1,5 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ForecastService } from './forecast.service.js';
 
 @Controller('forecast')
@@ -11,7 +12,13 @@ export class ForecastController {
   }
 
   @Get('insight/:productId')
-  async getInsight(@Param('productId') productId: string) {
+  async getInsight(
+    @Param('productId') productId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Prevent browsers/proxies from caching AI insight responses (was causing
+    // stale 304s to be served instead of a fresh Groq call).
+    res.set('Cache-Control', 'no-store');
     return this.forecastService.getAiInsight(productId);
   }
 }
