@@ -16,21 +16,18 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'https://medicarexpharmacyuom.netlify.app',
-      'https://innovatexuom.vercel.app',
+       'https://innovatexuom.vercel.app',
       /^http:\/\/localhost(:\d+)?$/,
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
-  });
+});
 
   app.setGlobalPrefix('api');
 
-  const port = process.env.PORT || 5000;
-
-  await app.listen(port, '0.0.0.0');
-
-  console.log(`Backend running on port ${port}`);
+  await app.listen(5000);
+  console.log('Backend running on http://localhost:5000');
 }
 
 bootstrap();
