@@ -371,6 +371,11 @@ export class LoyaltyService {
       pointsEarned: points,
       date: FieldValue.serverTimestamp(),
     });
+
+    // CRITICAL: Sync back to the main users document so mobile app sees it!
+    const newPoints = profile ? (profile.totalPoints || 0) + points : points;
+    const newLevel = this.calculateLevel(newPoints);
+    await this.syncLoyaltyToUserDoc(uid, newPoints, newLevel);
   }
 
   private async buildProfileFromOrders(
@@ -650,18 +655,20 @@ export class LoyaltyService {
     for (const doc of dispensedSnapshot.docs) {
       const dispense = doc.data();
       if (dispense.paymentStatus === 'paid' || dispense.total) {
+        let uid = dispense.userId;
         const email = dispense.patientEmail;
-        if (email) {
-          const uid = emailToUid.get(email.toLowerCase());
-          if (uid) {
-            if (!ordersByUser[uid]) ordersByUser[uid] = [];
-            ordersByUser[uid].push({
-              id: doc.id,
-              ...dispense,
-              totalAmount: Number(dispense.total || 0),
-              createdAt: dispense.createdAt || FieldValue.serverTimestamp(),
-            });
-          }
+        if (!uid && email) {
+          uid = emailToUid.get(email.toLowerCase());
+        }
+        
+        if (uid) {
+          if (!ordersByUser[uid]) ordersByUser[uid] = [];
+          ordersByUser[uid].push({
+            id: doc.id,
+            ...dispense,
+            totalAmount: Number(dispense.total || 0),
+            createdAt: dispense.createdAt || FieldValue.serverTimestamp(),
+          });
         }
       }
     }
