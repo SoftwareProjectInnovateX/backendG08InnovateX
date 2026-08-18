@@ -14,13 +14,12 @@ export class AdminProductApprovalService {
   ) {}
 
   // ── GET /admin/pending-products
-  // Pending items now live in 'products' collection with status: 'pending'
+  // Reads all products so Pending / Approved / Rejected / All filters work
   async getAllPending() {
     const db = this.firebaseService.getDb();
 
     const snapshot = await db
       .collection('products')
-      .where('status', '==', 'pending')
       .get();
 
     const products = snapshot.docs.map((d) => {
