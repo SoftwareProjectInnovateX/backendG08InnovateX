@@ -293,14 +293,28 @@ Maximum 2 sentences.
           },
         ],
         temperature: 0.3,
-        max_tokens: 100,
+      
+        max_tokens: 400,
       });
 
+    
+      this.logger.debug(
+        `Groq raw response for ${productId}: ${JSON.stringify(completion.choices[0])}`,
+      );
+
       const content = completion.choices[0]?.message?.content?.trim();
+      const hasContent = !!content && content.length > 0;
+
+      if (!hasContent) {
+        this.logger.warn(
+          `Groq returned empty content for ${productId} (finish_reason: ${completion.choices[0]?.finish_reason}). Falling back.`,
+        );
+      }
 
       return {
-        insight: content ?? this.generateFallbackInsight(product),
-        source: content ? 'ai' : 'fallback',
+       
+        insight: hasContent ? content! : this.generateFallbackInsight(product),
+        source: hasContent ? 'ai' : 'fallback',
       };
     } catch (err: any) {
       this.logger.error(
