@@ -111,6 +111,7 @@ export class LoyaltyService {
   private calculateLevel(points: number): 'Silver' | 'Gold' | 'Platinum' {
     if (points >= 5000) return 'Platinum';
     if (points >= 2000) return 'Gold';
+    if (points >= 1000) return 'Silver';
     return 'Silver';
   }
 
