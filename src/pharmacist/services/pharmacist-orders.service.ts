@@ -15,7 +15,18 @@ export class PharmacistOrdersService {
       .collection(this.collectionName)
       .orderBy('createdAt', 'desc')
       .get();
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map((doc) => {
+      const data = doc.data();
+      // Normalize: mobile app may save items as 'items' or 'types'
+      const items = data.items || data.types || [];
+      return {
+        id: doc.id,
+        ...data,
+        items,          // always set 'items'
+        types: items,   // always set 'types' (frontend uses this)
+        itemCount: items.length,
+      };
+    });
   }
 
   async addOnlineOrder(orderData: any) {

@@ -76,8 +76,8 @@ export class OrdersService {
     try {
       const db = this.firebaseService.getDb();
 
-      // ─── Read items from body (frontend sends field named 'items') ──────
-      const rawItems = body.items || [];
+      // ─── Read items from body (supports 'items', 'types', or 'cartItems' from mobile/web) ──
+      const rawItems = body.items || body.types || body.cartItems || [];
       const normalizedItems = await this.normalizeOrderItems(rawItems);
 
       const orderPayload = {
