@@ -14,20 +14,24 @@ export class AdminProductApprovalService {
   ) {}
 
   // ── GET /admin/pending-products
+  // Pending items now live in 'products' collection with status: 'pending'
   async getAllPending() {
     const db = this.firebaseService.getDb();
 
     const snapshot = await db
-      .collection('pendingProducts')
-      .orderBy('createdAt', 'desc')
+      .collection('products')
+      .where('status', '==', 'pending')
       .get();
 
-    return snapshot.docs.map((d) => {
+    const products = snapshot.docs.map((d) => {
       const data = d.data();
+
       return {
         id: d.id,
         ...data,
-        createdAt: data.createdAt ? { _seconds: data.createdAt.seconds } : null,
+        createdAt: data.createdAt
+          ? { _seconds: data.createdAt.seconds }
+          : null,
         approvedAt: data.approvedAt
           ? { _seconds: data.approvedAt.seconds }
           : null,
@@ -36,70 +40,91 @@ export class AdminProductApprovalService {
           : null,
       };
     });
+
+    // Sort newest first without requiring Firestore composite index
+    return products.sort((a: any, b: any) => {
+      const aTime = a.createdAt?._seconds ?? 0;
+      const bTime = b.createdAt?._seconds ?? 0;
+
+      return bTime - aTime;
+    });
   }
 
   // ── PATCH /admin/pending-products/:id/approve
-  async approveProduct(pendingProductId: string) {
+  async approveProduct(productId: string) {
     const db = this.firebaseService.getDb();
 
-    const pendingRef = db.collection('pendingProducts').doc(pendingProductId);
-    const pendingSnap = await pendingRef.get();
+    const productRef = db
+      .collection('products')
+      .doc(productId);
 
-    if (!pendingSnap.exists) {
-      throw new NotFoundException('Pending product not found');
+    const productSnap = await productRef.get();
+
+    if (!productSnap.exists) {
+      throw new NotFoundException('Product not found');
     }
 
-    const data = pendingSnap.data()!;
-    const productCode = await this.countersService.generateProductCode();
+    const data = productSnap.data()!;
+
+    const productCode =
+      await this.countersService.generateProductCode();
 
     const suppliedStock = data.stock ?? 0;
     const remainingStock = data.minStock ?? 0;
 
-    const productPayload = {
-      productName: data.productName,
-      productCode,
-      category: data.category,
-      wholesalePrice: data.wholesalePrice,
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: data.description || '',
-      manufacturer: data.manufacturer || '',
-      availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
-      supplierId: data.supplierId,
-      supplierName: data.supplierName,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    };
+    const availability =
+      suppliedStock > 0
+        ? 'in stock'
+        : 'out of stock';
 
-    // Add to live products collection
-    const productRef = await db.collection('products').add(productPayload);
-
-    // Add to adminProducts collection
-    await db.collection('adminProducts').add({
-      productId: productRef.id,
-      supplierId: data.supplierId,
-      supplierName: data.supplierName,
-      productName: data.productName,
+    // Update the live products doc — mark as approved
+    await productRef.update({
+      status: 'approved',
       productCode,
-      category: data.category,
-      wholesalePrice: data.wholesalePrice,
-      retailPrice: (data.wholesalePrice ?? 0) * 1.2,
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: data.description || '',
-      manufacturer: data.manufacturer || '',
-      availability: suppliedStock > 0 ? 'in stock' : 'out of stock',
-      lastRestocked: Timestamp.now(),
-      createdAt: Timestamp.now(),
+      availability,
+      approvedAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
 
-    // Update pendingProducts doc — supplier's onSnapshot fires here automatically
-    await pendingRef.update({
-      status: 'approved',
-      approvedAt: Timestamp.now(),
-      productCode,
+    // Update the matching adminProducts doc — mark as approved
+    const adminSnap = await db
+      .collection('adminProducts')
+      .where('productId', '==', productId)
+      .get();
+
+    if (!adminSnap.empty) {
+      await db
+        .collection('adminProducts')
+        .doc(adminSnap.docs[0].id)
+        .update({
+          status: 'approved',
+          productCode,
+          retailPrice:
+            (data.wholesalePrice ?? 0) * 1.2,
+          availability,
+          lastRestocked: Timestamp.now(),
+          approvedAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+    }
+
+    // Log the approved product into pendingProducts (audit trail only)
+    await db.collection('pendingProducts').add({
       productId: productRef.id,
+      supplierId: data.supplierId,
+      supplierName: data.supplierName,
+      productName: data.productName,
+      productCode,
+      category: data.category,
+      wholesalePrice: data.wholesalePrice,
+      stock: suppliedStock,
+      minStock: remainingStock,
+      description: data.description || '',
+      manufacturer: data.manufacturer || '',
+      status: 'approved',
+      createdAt:
+        data.createdAt || Timestamp.now(),
+      approvedAt: Timestamp.now(),
     });
 
     // Notify supplier
@@ -108,10 +133,13 @@ export class AdminProductApprovalService {
       recipientId: data.supplierId,
       recipientType: 'supplier',
       supplierId: data.supplierId,
-      pendingProductId,
+      productId,
       productName: data.productName,
       productCode,
-      message: `Your product "${data.productName}" (${productCode}) has been approved and added to the inventory.`,
+
+      message:
+        `Your product "${data.productName}" (${productCode}) has been approved and added to the inventory.`,
+
       read: false,
       createdAt: Timestamp.now(),
     });
@@ -130,28 +158,59 @@ export class AdminProductApprovalService {
       );
     }
 
-    return { success: true, productId: productRef.id, productCode };
+    return {
+      success: true,
+      productId,
+      productCode,
+    };
   }
 
   // ── PATCH /admin/pending-products/:id/reject
-  async rejectProduct(pendingProductId: string, reason?: string) {
+  async rejectProduct(
+    productId: string,
+    reason?: string,
+  ) {
     const db = this.firebaseService.getDb();
 
-    const pendingRef = db.collection('pendingProducts').doc(pendingProductId);
-    const pendingSnap = await pendingRef.get();
+    const productRef = db
+      .collection('products')
+      .doc(productId);
 
-    if (!pendingSnap.exists) {
-      throw new NotFoundException('Pending product not found');
+    const productSnap = await productRef.get();
+
+    if (!productSnap.exists) {
+      throw new NotFoundException('Product not found');
     }
 
-    const data = pendingSnap.data()!;
+    const data = productSnap.data()!;
 
-    // Update pendingProducts doc — supplier's onSnapshot fires here automatically
-    await pendingRef.update({
+    // Update the live products doc — mark as rejected
+    await productRef.update({
       status: 'rejected',
       rejectedAt: Timestamp.now(),
       rejectionReason: reason || '',
+      updatedAt: Timestamp.now(),
     });
+
+    // Update the matching adminProducts doc — mark as rejected
+    const adminSnap = await db
+      .collection('adminProducts')
+      .where('productId', '==', productId)
+      .get();
+
+    if (!adminSnap.empty) {
+      await db
+        .collection('adminProducts')
+        .doc(adminSnap.docs[0].id)
+        .update({
+          status: 'rejected',
+          rejectedAt: Timestamp.now(),
+          rejectionReason: reason || '',
+          updatedAt: Timestamp.now(),
+        });
+    }
+
+    // pendingProducts is intentionally NOT updated on rejection
 
     // Notify supplier
     await db.collection('notifications').add({
@@ -159,10 +218,17 @@ export class AdminProductApprovalService {
       recipientId: data.supplierId,
       recipientType: 'supplier',
       supplierId: data.supplierId,
-      pendingProductId,
+      productId,
       productName: data.productName,
       rejectionReason: reason || '',
-      message: `Your product "${data.productName}" was not approved.${reason ? ' Reason: ' + reason : ''}`,
+
+      message:
+        `Your product "${data.productName}" was not approved.${
+          reason
+            ? ' Reason: ' + reason
+            : ''
+        }`,
+
       read: false,
       createdAt: Timestamp.now(),
     });
@@ -181,6 +247,8 @@ export class AdminProductApprovalService {
       );
     }
 
-    return { success: true };
+    return {
+      success: true,
+    };
   }
 }
