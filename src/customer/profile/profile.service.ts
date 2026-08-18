@@ -29,8 +29,11 @@ export class ProfileService {
       };
     }
 
+    // 1 point for every Rs. 100 spent on each order.
+    // Math.floor removes fractional points for each individual order.
     const totalPoints = ordersSnap.docs.reduce((sum: number, doc: any) => {
-      return sum + Math.floor(doc.data().totalAmount || 0);
+      const orderAmount = Number(doc.data().totalAmount || 0);
+      return sum + Math.floor(orderAmount * 0.01);
     }, 0);
 
     return {
