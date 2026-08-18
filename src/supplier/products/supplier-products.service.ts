@@ -29,15 +29,22 @@ export class SupplierProductsService {
         ...d.data(),
       }))
       .sort((a: any, b: any) => {
-        const aTime = a.createdAt?.seconds ?? a.createdAt?._seconds ?? 0;
-        const bTime = b.createdAt?.seconds ?? b.createdAt?._seconds ?? 0;
+        const aTime =
+          a.createdAt?.seconds ??
+          a.createdAt?._seconds ??
+          0;
+
+        const bTime =
+          b.createdAt?.seconds ??
+          b.createdAt?._seconds ??
+          0;
 
         return bTime - aTime;
       });
   }
 
   // ── GET /supplier/products/pending?supplierId=xxx
-  // Returns pending submissions — now stored directly in 'products' collection
+  // Returns pending submissions from 'products'
   async getPendingProducts(supplierId: string) {
     const db = this.firebaseService.getDb();
 
@@ -53,12 +60,15 @@ export class SupplierProductsService {
       return {
         id: d.id,
         ...data,
+
         createdAt: data.createdAt
           ? { _seconds: data.createdAt.seconds }
           : null,
+
         approvedAt: data.approvedAt
           ? { _seconds: data.approvedAt.seconds }
           : null,
+
         rejectedAt: data.rejectedAt
           ? { _seconds: data.rejectedAt.seconds }
           : null,
@@ -67,16 +77,21 @@ export class SupplierProductsService {
 
     // Sort newest first without requiring a Firestore composite index
     return products.sort((a: any, b: any) => {
-      const aTime = a.createdAt?._seconds ?? 0;
-      const bTime = b.createdAt?._seconds ?? 0;
+      const aTime =
+        a.createdAt?._seconds ?? 0;
+
+      const bTime =
+        b.createdAt?._seconds ?? 0;
 
       return bTime - aTime;
     });
   }
 
   // ── POST /supplier/products
-  // Saves directly to 'products' (status: 'pending') and mirrors into 'adminProducts'.
-  // 'pendingProducts' is intentionally NOT written to on creation.
+  // Saves directly to 'products' (status: 'pending')
+  // and mirrors into 'adminProducts'.
+  //
+  // 'pendingProducts' is NOT written to on creation.
   async createProduct(
     supplierId: string,
     supplierName: string,
@@ -84,51 +99,120 @@ export class SupplierProductsService {
   ) {
     const db = this.firebaseService.getDb();
 
-    const suppliedStock = dto.stock || 0;
-    const remainingStock = dto.minStock || 0;
+    const suppliedStock =
+      dto.stock || 0;
+
+    const remainingStock =
+      dto.minStock || 0;
+
     const availability =
-      suppliedStock > 0 ? 'in stock' : 'out of stock';
+      suppliedStock > 0
+        ? 'in stock'
+        : 'out of stock';
+
+    const expireDate =
+      dto.expireDate
+        ? Timestamp.fromDate(
+            new Date(dto.expireDate),
+          )
+        : null;
 
     const productPayload = {
-      productName: dto.productName,
-      category: dto.category,
-      wholesalePrice: dto.wholesalePrice,
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: dto.description || '',
-      manufacturer: dto.manufacturer || '',
+      productName:
+        dto.productName,
+
+      category:
+        dto.category,
+
+      wholesalePrice:
+        dto.wholesalePrice,
+
+      stock:
+        suppliedStock,
+
+      minStock:
+        remainingStock,
+
+      description:
+        dto.description || '',
+
+      manufacturer:
+        dto.manufacturer || '',
+
+      // Save expiry date
+      expireDate,
+
       availability,
+
       supplierId,
       supplierName,
-      status: 'pending',
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+
+      status:
+        'pending',
+
+      createdAt:
+        Timestamp.now(),
+
+      updatedAt:
+        Timestamp.now(),
     };
 
-    // Add directly to the live products collection with pending status
+    // Add directly to products collection with pending status
     const productRef = await db
       .collection('products')
       .add(productPayload);
 
     // Mirror into adminProducts with pending status
-    await db.collection('adminProducts').add({
-      productId: productRef.id,
-      supplierId,
-      supplierName,
-      productName: dto.productName,
-      productCode: null,
-      category: dto.category,
-      wholesalePrice: dto.wholesalePrice,
-      retailPrice: (dto.wholesalePrice ?? 0) * 1.2,
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: dto.description || '',
-      manufacturer: dto.manufacturer || '',
-      availability,
-      status: 'pending',
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    });
+    await db
+      .collection('adminProducts')
+      .add({
+        productId:
+          productRef.id,
+
+        supplierId,
+        supplierName,
+
+        productName:
+          dto.productName,
+
+        productCode:
+          null,
+
+        category:
+          dto.category,
+
+        wholesalePrice:
+          dto.wholesalePrice,
+
+        retailPrice:
+          (dto.wholesalePrice ?? 0) * 1.2,
+
+        stock:
+          suppliedStock,
+
+        minStock:
+          remainingStock,
+
+        description:
+          dto.description || '',
+
+        manufacturer:
+          dto.manufacturer || '',
+
+        // Save expiry date
+        expireDate,
+
+        availability,
+
+        status:
+          'pending',
+
+        createdAt:
+          Timestamp.now(),
+
+        updatedAt:
+          Timestamp.now(),
+      });
 
     return {
       success: true,
@@ -142,51 +226,77 @@ export class SupplierProductsService {
     productId: string,
     dto: UpdateProductDto,
   ) {
-    const db = this.firebaseService.getDb();
+    const db =
+      this.firebaseService.getDb();
 
     const productRef = db
       .collection('products')
       .doc(productId);
 
-    const productSnap = await productRef.get();
+    const productSnap =
+      await productRef.get();
 
     if (!productSnap.exists) {
-      throw new NotFoundException('Product not found');
+      throw new NotFoundException(
+        'Product not found',
+      );
     }
 
-    const suppliedStock = dto.stock ?? 0;
-    const remainingStock = dto.minStock ?? 0;
+    const suppliedStock =
+      dto.stock ?? 0;
+
+    const remainingStock =
+      dto.minStock ?? 0;
 
     const updatedData = {
       ...(dto.productName && {
-        productName: dto.productName,
+        productName:
+          dto.productName,
       }),
 
       ...(dto.category && {
-        category: dto.category,
+        category:
+          dto.category,
       }),
 
       ...(dto.wholesalePrice && {
-        wholesalePrice: dto.wholesalePrice,
+        wholesalePrice:
+          dto.wholesalePrice,
       }),
 
-      stock: suppliedStock,
-      minStock: remainingStock,
-      description: dto.description ?? '',
-      manufacturer: dto.manufacturer ?? '',
+      stock:
+        suppliedStock,
+
+      minStock:
+        remainingStock,
+
+      description:
+        dto.description ?? '',
+
+      manufacturer:
+        dto.manufacturer ?? '',
+
       availability:
         suppliedStock > 0
           ? 'in stock'
           : 'out of stock',
-      updatedAt: Timestamp.now(),
+
+      updatedAt:
+        Timestamp.now(),
     };
 
-    await productRef.update(updatedData);
+    await productRef.update(
+      updatedData,
+    );
 
     // Keep adminProducts in sync
     const adminSnap = await db
       .collection('adminProducts')
-      .where('productId', '==', productId)
+      .where(
+        'productId',
+        '==',
+        productId,
+      )
       .get();
 
     if (!adminSnap.empty) {
@@ -195,8 +305,10 @@ export class SupplierProductsService {
         .doc(adminSnap.docs[0].id)
         .update({
           ...updatedData,
+
           ...(dto.wholesalePrice && {
-            retailPrice: dto.wholesalePrice * 1.2,
+            retailPrice:
+              dto.wholesalePrice * 1.2,
           }),
         });
     }
@@ -208,8 +320,11 @@ export class SupplierProductsService {
 
   // ── DELETE /supplier/products/:id
   // Only approved products can be deleted
-  async deleteProduct(productId: string) {
-    const db = this.firebaseService.getDb();
+  async deleteProduct(
+    productId: string,
+  ) {
+    const db =
+      this.firebaseService.getDb();
 
     await db
       .collection('products')
@@ -219,7 +334,11 @@ export class SupplierProductsService {
     // Remove from adminProducts too
     const adminSnap = await db
       .collection('adminProducts')
-      .where('productId', '==', productId)
+      .where(
+        'productId',
+        '==',
+        productId,
+      )
       .get();
 
     if (!adminSnap.empty) {
