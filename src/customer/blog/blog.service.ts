@@ -173,7 +173,10 @@ export class BlogService {
     while (attempt < maxRetries) {
       try {
         const response = await groqClient.chat.completions.create({
-          model: 'openai/gpt-oss-20b',
+          model:
+            attempt === maxRetries - 1
+              ? 'llama-3.3-70b-versatile'
+              : 'llama3-8b-8192',
           response_format: { type: 'json_object' },
           max_tokens: 4000,
           messages: [
