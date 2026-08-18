@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { AnalyseInvoicesDto, InvoiceRecord, GenerateSummaryPdfDto, GenerateBusinessAdvisorDto } from './dto/ai-analytics.dto.js';
 
@@ -19,7 +19,9 @@ interface ProductAnalyticsRecord extends InvoiceRecord {
   totalAmount: number;
 }
 
-function expandInvoiceItems(invoices: InvoiceRecord[]): ProductAnalyticsRecord[] {
+// ── FIX: default to [] so a missing/undefined `invoices` array
+// no longer throws "Cannot read properties of undefined (reading 'flatMap')"
+function expandInvoiceItems(invoices: InvoiceRecord[] = []): ProductAnalyticsRecord[] {
   return invoices.flatMap((inv) => {
     if (!inv.items?.length) return [{ ...inv }];
 
@@ -29,6 +31,19 @@ function expandInvoiceItems(invoices: InvoiceRecord[]): ProductAnalyticsRecord[]
       totalAmount: Math.max(0, item.quantity) * Math.max(0, item.unitPrice),
     }));
   });
+}
+
+// ── FIX: shared guard used at the top of every analytics method below.
+// Throws a clear 400 error instead of letting a TypeError crash deeper in
+// the call stack, so the real cause (missing/empty `invoices` in the
+// request body) is visible in the response instead of a generic 500.
+function assertInvoices(dto: AnalyseInvoicesDto): InvoiceRecord[] {
+  if (!dto || !Array.isArray(dto.invoices)) {
+    throw new BadRequestException(
+      'Request body is missing a valid "invoices" array.',
+    );
+  }
+  return dto.invoices;
 }
 
 /* ── PDF layout constants (used only by generateSummaryPdf) ── */
@@ -51,7 +66,8 @@ const PDF_COLORS = {
 export class AiAnalyticsService {
 
   supplyRecommendations(dto: AnalyseInvoicesDto) {
-    const productRecords = expandInvoiceItems(dto.invoices);
+    const invoices = assertInvoices(dto); // ── FIX
+    const productRecords = expandInvoiceItems(invoices);
     const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const recommendations = Object.entries(grouped).map(([productName, invs]) => {
@@ -111,7 +127,8 @@ export class AiAnalyticsService {
   }
 
   demandForecast(dto: AnalyseInvoicesDto) {
-    const productRecords = expandInvoiceItems(dto.invoices);
+    const invoices = assertInvoices(dto); // ── FIX
+    const productRecords = expandInvoiceItems(invoices);
     const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const forecasts = Object.entries(grouped)
@@ -158,13 +175,14 @@ export class AiAnalyticsService {
   }
 
   paymentRisk(dto: AnalyseInvoicesDto) {
+    const allInvoices = assertInvoices(dto); // ── FIX
     const today  = new Date().toISOString().split('T')[0];
-    const unpaid = dto.invoices.filter(
+    const unpaid = allInvoices.filter(
       (inv) => inv.paymentStatus === 'Pending' || inv.paymentStatus === 'Overdue'
     );
 
     const pharmacyStats: Record<string, { total: number; late: number }> = {};
-    dto.invoices.forEach((inv) => {
+    allInvoices.forEach((inv) => {
       pharmacyStats[inv.pharmacy] ??= { total: 0, late: 0 };
       pharmacyStats[inv.pharmacy].total++;
       if (inv.paymentStatus === 'Overdue') pharmacyStats[inv.pharmacy].late++;
@@ -209,7 +227,8 @@ export class AiAnalyticsService {
   }
 
   restockSuggestions(dto: AnalyseInvoicesDto) {
-    const productRecords = expandInvoiceItems(dto.invoices);
+    const invoices = assertInvoices(dto); // ── FIX
+    const productRecords = expandInvoiceItems(invoices);
     const grouped = groupBy(productRecords, (inv) => inv.productName);
 
     const suggestions = Object.entries(grouped).map(([productName, invs]) => {
